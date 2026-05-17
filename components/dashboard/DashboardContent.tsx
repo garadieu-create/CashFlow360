@@ -33,7 +33,20 @@ export default function DashboardContent() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <div style={{ fontSize: '64px', marginBottom: '24px', opacity: 0.3 }}>📊</div>
+          <div style={{ marginBottom: '24px', opacity: 0.8 }}>
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="8" y="32" width="12" height="24" rx="2" fill="url(#dash_grad)" />
+              <rect x="26" y="16" width="12" height="40" rx="2" fill="url(#dash_grad)" />
+              <rect x="44" y="24" width="12" height="32" rx="2" fill="url(#dash_grad)" />
+              <path d="M4 56H60" stroke="var(--border-primary)" strokeWidth="4" strokeLinecap="round" />
+              <defs>
+                <linearGradient id="dash_grad" x1="8" y1="16" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#F54E00" />
+                  <stop offset="1" stopColor="#FF7A33" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
           <h2 className="empty-state-title">Connect Your Wallet</h2>
           <p className="empty-state-text" style={{ marginBottom: '24px' }}>
             Connect your wallet to see real-time cash flow analytics from the Arc blockchain.

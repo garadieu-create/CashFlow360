@@ -89,7 +89,20 @@ export default function RunwayContent() {
     return (
       <div className="empty-state">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div style={{ fontSize: '64px', marginBottom: '24px', opacity: 0.3 }}>⏱️</div>
+          <div style={{ marginBottom: '24px', opacity: 0.8 }}>
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="32" cy="36" r="24" stroke="url(#runway_grad)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M32 20V36L42 42" stroke="url(#runway_grad)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M24 8H40" stroke="url(#runway_grad)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M32 8V12" stroke="url(#runway_grad)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+              <defs>
+                <linearGradient id="runway_grad" x1="8" y1="8" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#F54E00" />
+                  <stop offset="1" stopColor="#F7A501" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
           <h2 className="empty-state-title">Connect Wallet for Runway Analysis</h2>
           <p className="empty-state-text" style={{ marginBottom: '24px' }}>
             Calculate your SME cash runway based on real on-chain transaction patterns.

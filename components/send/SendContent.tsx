@@ -24,7 +24,20 @@ export default function SendContent() {
     return (
       <div className="empty-state">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div style={{ fontSize: '64px', marginBottom: '24px', opacity: 0.3 }}>💸</div>
+          <div style={{ marginBottom: '24px', opacity: 0.8 }}>
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="8" y="16" width="48" height="32" rx="4" stroke="url(#send_grad)" strokeWidth="4" />
+              <circle cx="32" cy="32" r="8" stroke="url(#send_grad)" strokeWidth="4" />
+              <path d="M8 24H16M8 40H16M48 24H56M48 40H56" stroke="url(#send_grad)" strokeWidth="4" strokeLinecap="round" />
+              <path d="M40 8L48 16M48 16L56 8" stroke="url(#send_grad)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+              <defs>
+                <linearGradient id="send_grad" x1="8" y1="8" x2="56" y2="48" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#77B96C" />
+                  <stop offset="1" stopColor="#FF7A33" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
           <h2 className="empty-state-title">Connect Wallet to Send</h2>
           <p className="empty-state-text" style={{ marginBottom: '24px' }}>
             Send USDC to any address on Arc Testnet using Circle App Kit Send.

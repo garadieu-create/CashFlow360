@@ -16,7 +16,22 @@ export default function SankeyFlowContent() {
     return (
       <div className="empty-state">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div style={{ fontSize: '64px', marginBottom: '24px', opacity: 0.3 }}>🌊</div>
+          <div style={{ marginBottom: '24px', opacity: 0.8 }}>
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 32C8 32 16 24 24 32C32 40 40 24 48 32C56 40 64 32 64 32" stroke="url(#flow_grad)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M0 48C0 48 8 40 16 48C24 56 32 40 40 48C48 56 56 40 64 48" stroke="url(#flow_grad_2)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+              <defs>
+                <linearGradient id="flow_grad" x1="8" y1="24" x2="64" y2="40" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#1D4AFF" />
+                  <stop offset="1" stopColor="#7091FF" />
+                </linearGradient>
+                <linearGradient id="flow_grad_2" x1="0" y1="40" x2="64" y2="56" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#1D4AFF" stopOpacity="0.5" />
+                  <stop offset="1" stopColor="#7091FF" stopOpacity="0.5" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
           <h2 className="empty-state-title">Connect Wallet to View Flow Map</h2>
           <p className="empty-state-text" style={{ marginBottom: '24px' }}>
             The Sankey diagram visualizes your USDC money flows in real-time from on-chain events.

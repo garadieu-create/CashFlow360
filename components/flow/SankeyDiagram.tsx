@@ -210,7 +210,22 @@ export default function SankeyDiagram({ transactions }: { transactions: Transact
   if (transactions.length === 0) {
     return (
       <div className="empty-state" style={{ minHeight: 400 }}>
-        <div style={{ fontSize: 48, opacity: 0.3, marginBottom: 16 }}>🌊</div>
+        <div style={{ marginBottom: 16, opacity: 0.8 }}>
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 32C8 32 16 24 24 32C32 40 40 24 48 32C56 40 64 32 64 32" stroke="url(#flow_grad_sm)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M0 48C0 48 8 40 16 48C24 56 32 40 40 48C48 56 56 40 64 48" stroke="url(#flow_grad_sm_2)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+            <defs>
+              <linearGradient id="flow_grad_sm" x1="8" y1="24" x2="64" y2="40" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#1D4AFF" />
+                <stop offset="1" stopColor="#7091FF" />
+              </linearGradient>
+              <linearGradient id="flow_grad_sm_2" x1="0" y1="40" x2="64" y2="56" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#1D4AFF" stopOpacity="0.5" />
+                <stop offset="1" stopColor="#7091FF" stopOpacity="0.5" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
         <h3 className="empty-state-title">No Flow Data Yet</h3>
         <p className="empty-state-text">
           Send or receive USDC on Arc Testnet to see your money flow visualized as a Sankey diagram.

@@ -22,7 +22,19 @@ export default function TransactionTable({ transactions, isLoading }: Props) {
     return (
       <div className="card-body">
         <div className="empty-state" style={{ padding: 'var(--space-2xl)' }}>
-          <div style={{ fontSize: 32, opacity: 0.3, marginBottom: 12 }}>📋</div>
+          <div style={{ marginBottom: 12, opacity: 0.8 }}>
+            <svg width="48" height="48" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="12" y="16" width="40" height="40" rx="4" stroke="var(--border-primary)" strokeWidth="4" />
+              <rect x="24" y="8" width="16" height="16" rx="2" stroke="url(#table_grad)" strokeWidth="4" fill="var(--bg-surface)" />
+              <path d="M24 36H40M24 44H32" stroke="url(#table_grad)" strokeWidth="4" strokeLinecap="round" />
+              <defs>
+                <linearGradient id="table_grad" x1="24" y1="8" x2="40" y2="44" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#B62AD9" />
+                  <stop offset="1" stopColor="#E26DF8" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
           <p className="empty-state-text">
             No USDC transactions found. Use the faucet to get testnet USDC, then send or receive tokens.
           </p>

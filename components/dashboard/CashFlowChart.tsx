@@ -38,7 +38,19 @@ export default function CashFlowChart({ data }: { data: ChartData[] }) {
   if (data.length === 0) {
     return (
       <div className="empty-state" style={{ height: 260, padding: 'var(--space-2xl)' }}>
-        <div style={{ fontSize: 32, opacity: 0.3, marginBottom: 12 }}>📈</div>
+        <div style={{ marginBottom: 12, opacity: 0.8 }}>
+          <svg width="48" height="48" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 56H56" stroke="var(--border-primary)" strokeWidth="4" strokeLinecap="round" />
+            <path d="M8 40L24 24L36 32L56 8" stroke="url(#chart_grad)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M56 8V24M56 8H40" stroke="url(#chart_grad)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+            <defs>
+              <linearGradient id="chart_grad" x1="8" y1="8" x2="56" y2="40" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#77B96C" />
+                <stop offset="1" stopColor="#A8D8A0" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
         <p className="empty-state-text">Send or receive USDC to generate chart data from on-chain events.</p>
       </div>
     );

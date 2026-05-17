@@ -19,7 +19,19 @@ export default function BridgePage() {
           {!isConnected ? (
             <div className="empty-state">
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                <div style={{ fontSize: '64px', marginBottom: '24px', opacity: 0.3 }}>🌉</div>
+              <div style={{ marginBottom: '24px', opacity: 0.8 }}>
+                <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M8 48C16 32 48 32 56 48" stroke="url(#bridge_grad)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M16 42V56M48 42V56M32 35V56" stroke="var(--border-primary)" strokeWidth="4" strokeLinecap="round" />
+                  <path d="M4 56H60" stroke="url(#bridge_grad)" strokeWidth="4" strokeLinecap="round" />
+                  <defs>
+                    <linearGradient id="bridge_grad" x1="4" y1="32" x2="60" y2="56" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#1D4AFF" />
+                      <stop offset="1" stopColor="#B62AD9" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
                 <h2 className="empty-state-title">Connect Wallet</h2>
                 <p className="empty-state-text" style={{ marginBottom: 24 }}>Bridge USDC across chains using Circle CCTP.</p>
                 <ConnectButton />

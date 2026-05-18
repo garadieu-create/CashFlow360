@@ -446,6 +446,7 @@ a:hover {
 /* === Tables === */
 .table-container {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .data-table {
@@ -897,8 +898,30 @@ a:hover {
 }
 
 @media (max-width: 768px) {
-  .app-sidebar { transform: translateX(-100%); }
+  .app-layout { flex-direction: column; }
+  .app-sidebar { 
+    position: static; 
+    width: 100%; 
+    transform: none;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border-primary);
+  }
   .app-main { margin-left: 0; }
   .stat-grid { grid-template-columns: 1fr; }
   .grid-3 { grid-template-columns: 1fr; }
+  .topbar-chain-badge { display: none; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--border-primary) 50%, var(--bg-elevated) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+  color: transparent !important;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }

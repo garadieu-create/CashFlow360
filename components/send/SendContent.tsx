@@ -11,6 +11,17 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Send, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+function parseError(error: any): string {
+  if (!error) return '';
+  const msg = error.message || error.toString();
+  if (msg.includes('User rejected')) return 'Transaction rejected by user in wallet.';
+  if (msg.includes('insufficient funds')) return 'Insufficient native tokens for gas fees.';
+  if (msg.includes('ERC20: transfer amount exceeds balance') || msg.includes('transfer amount exceeds balance')) return 'Transfer amount exceeds USDC balance.';
+  if (msg.includes('execution reverted')) return 'Transaction was reverted by the smart contract.';
+  if (msg.includes('Connector not connected')) return 'Wallet disconnected. Please reconnect.';
+  return 'Transaction failed. Please check your inputs and try again.';
+}
+
 export default function SendContent() {
   const { isConnected, address } = useAccount();
   const { formatted: balance, refetch } = useUSDCBalance();
@@ -131,6 +142,20 @@ export default function SendContent() {
               </div>
             </div>
 
+            {/* Network Fee Preview */}
+            <div style={{ padding: 'var(--space-md)', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-primary)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Network Fee (Est.)</span>
+                <span style={{ fontFamily: 'var(--font-mono)' }}>~0.00015 ARC</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Estimated Balance After</span>
+                <span style={{ fontFamily: 'var(--font-mono)' }}>
+                  ${amount ? Math.max(0, parseFloat(balance) - parseFloat(amount)).toLocaleString('en-US', { minimumFractionDigits: 2 }) : balance}
+                </span>
+              </div>
+            </div>
+
             {/* Submit */}
             <button
               className="btn btn-primary btn-lg"
@@ -175,24 +200,49 @@ export default function SendContent() {
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, wordBreak: 'break-all' }}>
                   {txHash}
                 </div>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ marginTop: 12, width: '100%', background: 'rgba(255,255,255,0.1)' }}
+                  onClick={() => {
+                    setAmount('');
+                    setRecipient('');
+                    reset();
+                  }}
+                >
+                  Send Another
+                </button>
               </motion.div>
             )}
 
             {/* Error State */}
             {error && (
-              <div style={{
-                padding: 'var(--space-lg)',
-                background: 'var(--ph-red-light)',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid rgba(245, 78, 0, 0.3)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{
+                  padding: 'var(--space-lg)',
+                  background: 'var(--ph-red-light)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid rgba(245, 78, 0, 0.3)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <AlertCircle size={16} color="var(--ph-red)" />
                   <span style={{ fontWeight: 600, color: 'var(--ph-red)', fontSize: 13 }}>
-                    {error.message.includes('User rejected') ? 'Transaction rejected by user' : 'Transaction failed'}
+                    Transaction Failed
                   </span>
                 </div>
-              </div>
+                <div style={{ fontSize: 12, color: 'var(--ph-red)', opacity: 0.9, paddingLeft: 24, lineHeight: 1.5 }}>
+                  {parseError(error)}
+                </div>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ marginTop: 12, color: 'var(--ph-red)', width: '100%', background: 'rgba(245, 78, 0, 0.1)' }}
+                  onClick={() => reset()}
+                >
+                  Dismiss
+                </button>
+              </motion.div>
             )}
           </div>
         </motion.div>

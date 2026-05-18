@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { ArrowUpDown, ExternalLink, Info } from 'lucide-react';
+import { WalletEmptyState } from '@/components/ui/WalletEmptyState';
 
 export default function BridgePage() {
   const { isConnected } = useAccount();
@@ -17,9 +18,10 @@ export default function BridgePage() {
         <Topbar title="Bridge & Swap" />
         <div className="app-content">
           {!isConnected ? (
-            <div className="empty-state">
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-              <div style={{ marginBottom: '24px', opacity: 0.8 }}>
+            <WalletEmptyState
+              title="Connect Wallet"
+              description="Bridge USDC across chains using Circle CCTP."
+              svgIcon={
                 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M8 48C16 32 48 32 56 48" stroke="url(#bridge_grad)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
                   <path d="M16 42V56M48 42V56M32 35V56" stroke="var(--border-primary)" strokeWidth="4" strokeLinecap="round" />
@@ -31,12 +33,8 @@ export default function BridgePage() {
                     </linearGradient>
                   </defs>
                 </svg>
-              </div>
-                <h2 className="empty-state-title">Connect Wallet</h2>
-                <p className="empty-state-text" style={{ marginBottom: 24 }}>Bridge USDC across chains using Circle CCTP.</p>
-                <ConnectButton />
-              </motion.div>
-            </div>
+              }
+            />
           ) : (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <div className="page-header">

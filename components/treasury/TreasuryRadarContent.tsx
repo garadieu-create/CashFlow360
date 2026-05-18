@@ -10,6 +10,7 @@ import { arcTestnet, USDC_ADDRESS } from '@/lib/arc-config';
 import { USDC_ABI } from '@/lib/contracts';
 import { useReadContract } from 'wagmi';
 import { formatUnits } from 'viem';
+import { WalletEmptyState } from '@/components/ui/WalletEmptyState';
 
 // Known USDC addresses on testnets
 const TESTNET_USDC: Record<number, `0x${string}`> = {
@@ -105,30 +106,25 @@ export default function TreasuryRadarContent() {
 
   if (!isConnected) {
     return (
-      <div className="empty-state">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div style={{ marginBottom: '24px', opacity: 0.8 }}>
-            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M32 16C24 16 18 22 18 30C18 32 44 32 46 30C46 22 40 16 32 16Z" fill="url(#radar_grad)" />
-              <path d="M8 32C8 32 16 40 32 40C48 40 56 32 56 32" stroke="url(#radar_grad)" strokeWidth="4" strokeLinecap="round" />
-              <circle cx="32" cy="48" r="4" fill="var(--border-primary)" />
-              <circle cx="20" cy="44" r="3" fill="var(--border-primary)" />
-              <circle cx="44" cy="44" r="3" fill="var(--border-primary)" />
-              <defs>
-                <linearGradient id="radar_grad" x1="8" y1="16" x2="56" y2="40" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#F54E00" />
-                  <stop offset="1" stopColor="#B62AD9" />
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          <h2 className="empty-state-title">Connect Wallet for Treasury Radar</h2>
-          <p className="empty-state-text" style={{ marginBottom: '24px' }}>
-            View your USDC holdings across Ethereum, Base, Arbitrum, and Arc — all in one radar view.
-          </p>
-          <ConnectButton />
-        </motion.div>
-      </div>
+      <WalletEmptyState
+        title="Connect Wallet for Treasury Radar"
+        description="View your USDC holdings across Ethereum, Base, Arbitrum, and Arc — all in one radar view."
+        svgIcon={
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M32 16C24 16 18 22 18 30C18 32 44 32 46 30C46 22 40 16 32 16Z" fill="url(#radar_grad)" />
+            <path d="M8 32C8 32 16 40 32 40C48 40 56 32 56 32" stroke="url(#radar_grad)" strokeWidth="4" strokeLinecap="round" />
+            <circle cx="32" cy="48" r="4" fill="var(--border-primary)" />
+            <circle cx="20" cy="44" r="3" fill="var(--border-primary)" />
+            <circle cx="44" cy="44" r="3" fill="var(--border-primary)" />
+            <defs>
+              <linearGradient id="radar_grad" x1="8" y1="16" x2="56" y2="40" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#F54E00" />
+                <stop offset="1" stopColor="#B62AD9" />
+              </linearGradient>
+            </defs>
+          </svg>
+        }
+      />
     );
   }
 

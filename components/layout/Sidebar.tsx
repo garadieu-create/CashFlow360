@@ -14,6 +14,7 @@ import {
   Settings,
   ExternalLink,
   FileText,
+  Code,
 } from 'lucide-react';
 
 const navItems = [
@@ -38,6 +39,7 @@ const navItems = [
     items: [
       { label: 'Alerts', href: '/alerts', icon: Bell },
       { label: 'Integrations', href: '/integrations', icon: Settings },
+      { label: 'Modal Showcase', href: '/modals', icon: Code },
     ],
   },
 ];

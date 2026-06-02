@@ -10,6 +10,7 @@ import TransactionTable from './TransactionTable';
 import { WalletEmptyState } from '@/components/ui/WalletEmptyState';
 import { StatGrid } from './StatGrid';
 import { MultiBalanceBar } from './MultiBalanceBar';
+import { OnboardingTour } from '@/components/ui/OnboardingTour';
 
 function formatUSD(val: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -70,10 +71,13 @@ export default function DashboardContent() {
             Real-time analytics from Arc Testnet • {transactions.length} transactions indexed
           </p>
         </div>
-        <button className="btn btn-secondary" onClick={handleRefresh} disabled={loadingTx}>
-          <RefreshCw size={14} className={loadingTx ? 'spinning' : ''} />
-          Refresh
-        </button>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <OnboardingTour />
+          <button className="btn btn-secondary" onClick={handleRefresh} disabled={loadingTx}>
+            <RefreshCw size={14} className={loadingTx ? 'spinning' : ''} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* KPI Stats Grid */}

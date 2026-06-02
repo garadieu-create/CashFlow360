@@ -7,7 +7,8 @@ export default function Topbar({ title }: { title: string }) {
     <header className="app-topbar">
       <div className="topbar-left">
         <span className="topbar-breadcrumb">
-          <span>CashFlow360</span> / {title}
+          <span className="topbar-brand-prefix">CashFlow360 / </span>
+          <span className="topbar-active-title">{title}</span>
         </span>
       </div>
       <div className="topbar-right">

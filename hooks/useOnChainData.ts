@@ -97,7 +97,7 @@ export function useTransactionHistory() {
 
       const blockNumber = await publicClient.getBlockNumber();
       // Fetch last 5000 blocks to prevent excessive RPC load, or from 0
-      const fromBlock = blockNumber > 5000n ? blockNumber - 5000n : 0n;
+      const fromBlock = blockNumber > BigInt(5000) ? blockNumber - BigInt(5000) : BigInt(0);
 
       // Fetch transfer events from USDC contract
       const [sentLogs, receivedLogs] = await Promise.all([
@@ -163,11 +163,11 @@ export function useTransactionHistory() {
           hash: log.transactionHash as string,
           from: (log.args as any).from as string,
           to: (log.args as any).to as string,
-          value: formatUnits((log.args as any).value || 0n, USDC_DECIMALS),
+          value: formatUnits((log.args as any).value || BigInt(0), USDC_DECIMALS),
           timestamp,
           type,
           category: type === 'inflow' ? 'Transfer In' : 'Transfer Out',
-          blockNumber: bNum || 0n,
+          blockNumber: bNum || BigInt(0),
         };
       });
 

@@ -57,18 +57,18 @@ export default function SankeyDiagram({ transactions }: { transactions: Transact
     }
 
     // Create source nodes → Treasury links
-    for (const [source, value] of inflowMap.entries()) {
-      if (value <= 0) continue;
+    inflowMap.forEach((value, source) => {
+      if (value <= 0) return;
       const srcIdx = getNodeIndex(source, '#77B96C');
       linksArr.push({ source: srcIdx, target: treasuryIdx, value });
-    }
+    });
 
     // Create Treasury → destination links
-    for (const [dest, value] of outflowMap.entries()) {
-      if (value <= 0) continue;
+    outflowMap.forEach((value, dest) => {
+      if (value <= 0) return;
       const destIdx = getNodeIndex(dest, '#F54E00');
       linksArr.push({ source: treasuryIdx, target: destIdx, value });
-    }
+    });
 
     return { nodes: nodesArr, links: linksArr };
   }, [transactions]);
@@ -154,8 +154,16 @@ export default function SankeyDiagram({ transactions }: { transactions: Transact
       path.setAttribute('stroke-opacity', '0.25');
       path.setAttribute('class', 'sankey-link');
 
-      // Animate
-      const length = path.getTotalLength?.() || 500;
+      // Animate safely
+      let length = 500;
+      try {
+        if (typeof path.getTotalLength === 'function') {
+          // Some browsers require the path to be in the DOM to call getTotalLength, so we try-catch
+          length = path.getTotalLength() || 500;
+        }
+      } catch (e) {
+        length = 500;
+      }
       path.style.strokeDasharray = `${length}`;
       path.style.strokeDashoffset = `${length}`;
       path.style.animation = `sankey-draw 1.5s ease forwards`;

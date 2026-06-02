@@ -63,20 +63,110 @@ export default function DashboardContent() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Page Header */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Cash Flow Dashboard</h1>
-          <p className="page-subtitle">
-            Real-time analytics from Arc Testnet • {transactions.length} transactions indexed
-          </p>
+      {/* Neo-Brutalist Architectural Hero Block */}
+      <div className="brutalist-hero" style={{
+        display: 'grid',
+        gridTemplateColumns: '2fr 1.2fr 1fr',
+        border: '2px solid var(--text-primary)',
+        background: 'var(--bg-secondary)',
+        marginBottom: 'var(--space-2xl)',
+        boxShadow: '8px 8px 0px rgba(0,0,0,0.9)'
+      }}>
+        {/* Left Column: Branding, dynamic status, and quick tour/refresh CTAs */}
+        <div style={{
+          padding: '24px',
+          borderRight: '2px solid var(--text-primary)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          minHeight: '240px'
+        }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <span className="badge badge-purple" style={{ border: '1px solid var(--ph-purple)' }}>AXIS No. 01 // PLATFORM</span>
+              <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>SYS_VER_4.12</span>
+            </div>
+            <h1 className="brutalist-outline-title" style={{ fontSize: 44, margin: '12px 0 6px', color: 'var(--text-primary)', WebkitTextStroke: 'unset', fontWeight: 900 }}>
+              CASHFLOW<span style={{ color: 'var(--ph-red)' }}>360</span>
+            </h1>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', maxWidth: '460px', lineHeight: 1.5 }}>
+              Real-time cash flow intelligence for SMEs on Arc Testnet. Tracking transaction velocity, automated liquidity thresholds, and instant USDC bridges.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+            <OnboardingTour />
+            <button className="btn btn-primary" onClick={handleRefresh} disabled={loadingTx}>
+              <RefreshCw size={12} className={loadingTx ? 'spinning' : ''} />
+              Refetch Stream
+            </button>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <OnboardingTour />
-          <button className="btn btn-secondary" onClick={handleRefresh} disabled={loadingTx}>
-            <RefreshCw size={14} className={loadingTx ? 'spinning' : ''} />
-            Refresh
-          </button>
+
+        {/* Center Column: Giant overlapping geometric typography artwork */}
+        <div style={{
+          padding: '24px',
+          borderRight: '2px solid var(--text-primary)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          background: 'var(--bg-primary)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            fontSize: 72,
+            fontWeight: 900,
+            fontFamily: 'var(--font-mono)',
+            lineHeight: 0.8,
+            color: 'transparent',
+            WebkitTextStroke: '2px rgba(255, 255, 255, 0.08)',
+            transform: 'rotate(-90deg) scale(1.3)',
+            whiteSpace: 'nowrap'
+          }}>
+            FLOWS
+          </div>
+          <div style={{
+            position: 'absolute',
+            bottom: 12,
+            right: 12,
+            fontSize: 10,
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--ph-red)',
+            fontWeight: 700
+          }}>
+            ACTIVE_INDEXER
+          </div>
+        </div>
+
+        {/* Right Column: Architectural specs & transaction stats */}
+        <div style={{
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          background: 'var(--bg-secondary)'
+        }}>
+          <div>
+            <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              ©2026 CORE_SYSTEM
+            </span>
+            <div style={{ 
+              fontSize: 32, 
+              fontWeight: 800, 
+              fontFamily: 'var(--font-mono)', 
+              color: 'var(--ph-red)', 
+              marginTop: 12 
+            }}>
+              {transactions.length}
+            </div>
+            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', fontWeight: 700 }}>
+              On-Chain Tx Indexed
+            </div>
+          </div>
+          <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', lineHeight: 1.4 }}>
+            Direct data aggregation stream via Arc Testnet. 1:1 USDC reserves audited.
+          </div>
         </div>
       </div>
 

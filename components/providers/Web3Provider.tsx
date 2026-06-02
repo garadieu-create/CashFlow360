@@ -5,6 +5,8 @@ import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { wagmiConfig } from '@/lib/wagmi-config';
 import '@rainbow-me/rainbowkit/styles.css';
+import { ModalProvider } from '@/context/ModalContext';
+import { GlobalModal } from '@/components/ui/GlobalModal';
 
 const queryClient = new QueryClient();
 
@@ -22,7 +24,10 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
           })}
           initialChain={wagmiConfig.chains[0]}
         >
-          {children}
+          <ModalProvider>
+            {children}
+            <GlobalModal />
+          </ModalProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

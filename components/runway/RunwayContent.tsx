@@ -7,6 +7,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useState, useMemo } from 'react';
 import { TrendingDown, AlertTriangle, Shield, Fuel, DollarSign } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
 function formatUSD(val: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(val);
@@ -135,8 +136,16 @@ export default function RunwayContent() {
         style={{ marginBottom: 'var(--space-xl)' }}
       >
         <div className="card-body" style={{ textAlign: 'center', padding: 'var(--space-2xl)' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', marginBottom: 8 }}>
             Estimated Cash Runway
+            <InfoTooltip
+              title="Estimated Cash Runway"
+              definition="The projected number of days until your cash balance reaches $0 based on your current net daily burn rate."
+              importance="Crucial for operational planning, payroll stability, and determining when you need new capital injections or collections."
+              calculation="Current Balance / Net Daily Burn"
+              goodVsBad="Healthy: 90+ days. Caution: 30-60 days. Critical: <30 days."
+              guidance="If this drops below 60 days, trigger cost controls, speed up invoice collection, or bridge USDC from other treasury chains."
+            />
           </div>
           <div style={{
             fontFamily: 'var(--font-mono)',
@@ -171,19 +180,59 @@ export default function RunwayContent() {
       {/* Stats Row */}
       <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 'var(--space-xl)' }}>
         <div className="stat-card">
-          <div className="stat-label">Current Balance</div>
+          <div className="stat-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Current Balance</span>
+            <InfoTooltip
+              title="Current Balance"
+              definition="Your on-chain liquid assets on Arc, including simulated cross-chain bridge injections."
+              importance="Acts as the starting capital for the 90-day runway projection."
+              calculation="Arc USDC Balance + Simulated Bridge Amount"
+              goodVsBad="Higher is safer. Ensure this covers at least 90 days of burn."
+              guidance="If low, bridge in additional USDC from Ethereum or Base Sepolia using our Bridge utility."
+            />
+          </div>
           <div className="stat-value" style={{ fontSize: 20 }}>{formatUSD(currentBalance)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Avg Daily Inflow</div>
+          <div className="stat-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Avg Daily Inflow</span>
+            <InfoTooltip
+              title="Avg Daily Inflow"
+              definition="The average amount of USDC deposited into your wallet per day, adjusted for what-if revenue change scenarios."
+              importance="Represents your daily income run rate."
+              calculation="Cumulative Inflows / Monitored Days * (1 + % Revenue Change)"
+              goodVsBad="Higher is better. Should ideally exceed daily outflow."
+              guidance="Improve collection efficiency by sending invoices earlier or offering early payment discounts."
+            />
+          </div>
           <div className="stat-value positive" style={{ fontSize: 20 }}>{formatUSD(runway.dailyInflow)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Avg Daily Outflow</div>
+          <div className="stat-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Avg Daily Outflow</span>
+            <InfoTooltip
+              title="Avg Daily Outflow"
+              definition="The average amount of USDC spent from your wallet per day, adjusted for what-if monthly expense scenarios."
+              importance="Represents your daily expenditure run rate."
+              calculation="(Cumulative Outflows / Monitored Days) + (Extra Monthly Expense / 30)"
+              goodVsBad="Lower is safer. Keeps the burn rate controlled."
+              guidance="Audit subscriptions and contractor hours to reduce non-essential outbound money flows."
+            />
+          </div>
           <div className="stat-value negative" style={{ fontSize: 20 }}>{formatUSD(runway.dailyOutflow)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Net Daily Burn</div>
+          <div className="stat-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Net Daily Burn</span>
+            <InfoTooltip
+              title="Net Daily Burn"
+              definition="The net amount of cash you lose (burn) or accumulate per day."
+              importance="Tells you whether your business is accumulating reserves or bleeding cash daily."
+              calculation="Avg Daily Outflow - Avg Daily Inflow"
+              goodVsBad="Negative (surplus) is healthy; positive (burn) requires vigilance."
+              guidance="If net daily burn is high, consider re-negotiating supplier payouts or raising capital."
+            />
+          </div>
           <div className={`stat-value ${runway.netBurn <= 0 ? 'positive' : 'negative'}`} style={{ fontSize: 20 }}>
             {runway.netBurn <= 0 ? '+' : '-'}{formatUSD(Math.abs(runway.netBurn))}
           </div>
@@ -267,9 +316,17 @@ export default function RunwayContent() {
               {/* Revenue Change */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span className="input-label">
-                    <TrendingDown size={12} style={{ display: 'inline', marginRight: 4 }} />
+                  <span className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <TrendingDown size={12} />
                     Revenue Change
+                    <InfoTooltip
+                      title="Revenue Change Scenario"
+                      definition="Simulates a percentage increase or decrease in customer payments (inflow)."
+                      importance="Helpful for preparing for macro downturns, client contract cancellations, or sales spikes."
+                      calculation="Adjusted Inflow = Base Inflow * (1 + % Change)"
+                      goodVsBad="Positive % is good. Negative % simulates business stress."
+                      guidance="Try simulating a -20% downturn to verify if your cash runway remains above the 60-day warning threshold."
+                    />
                   </span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 13, color: revenueChange < 0 ? 'var(--ph-red)' : 'var(--ph-green)' }}>
                     {revenueChange >= 0 ? '+' : ''}{revenueChange}%
@@ -294,9 +351,17 @@ export default function RunwayContent() {
               {/* Extra Monthly Expense */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span className="input-label">
-                    <DollarSign size={12} style={{ display: 'inline', marginRight: 4 }} />
+                  <span className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <DollarSign size={12} />
                     Extra Monthly Expense
+                    <InfoTooltip
+                      title="Extra Monthly Expense Scenario"
+                      definition="Simulates additional monthly recurring outflows, such as new hires, tool subscriptions, or rent."
+                      importance="Helps evaluate whether the business can afford expansion or new projects."
+                      calculation="Adjusted Outflow = Base Outflow + (Extra / 30)"
+                      goodVsBad="Adds to net burn. Keep this as low as possible."
+                      guidance="Simulate a new hire ($5,000/mo) to see the long-term impact on your business runway before making the hire."
+                    />
                   </span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 13, color: 'var(--ph-red)' }}>
                     +{formatUSD(extraExpense)}/mo
@@ -322,9 +387,17 @@ export default function RunwayContent() {
               {/* Bridge Amount */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span className="input-label">
-                    <Fuel size={12} style={{ display: 'inline', marginRight: 4 }} />
+                  <span className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Fuel size={12} />
                     Bridge USDC from Other Chain
+                    <InfoTooltip
+                      title="Bridge USDC Scenario"
+                      definition="Simulates instantly injecting USDC into your Arc treasury from other chains (Ethereum, Base, etc.)."
+                      importance="Enables you to see how cross-chain treasury rebalancing extends your runway."
+                      calculation="Adjusted Balance = Current Balance + Bridged Amount"
+                      goodVsBad="Increases your cash balance, extending runway days."
+                      guidance="Slide this to match your available balances on other networks (shown on the Treasury Radar) to see if bridging will solve a runway crisis."
+                    />
                   </span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 13, color: 'var(--ph-green)' }}>
                     +{formatUSD(bridgeAmount)}

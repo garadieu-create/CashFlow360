@@ -10,6 +10,7 @@ import { motion } from 'framer-motion';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Send, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Link from 'next/link';
 
 function parseError(error: any): string {
   if (!error) return '';
@@ -192,25 +193,45 @@ export default function SendContent() {
                   href={getExplorerTxUrl(txHash)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
+                  style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}
                 >
                   <ExternalLink size={12} />
                   View on Arcscan
                 </a>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, wordBreak: 'break-all' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)', wordBreak: 'break-all', marginBottom: 12 }}>
                   {txHash}
                 </div>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  style={{ marginTop: 12, width: '100%', background: 'rgba(255,255,255,0.1)' }}
-                  onClick={() => {
-                    setAmount('');
-                    setRecipient('');
-                    reset();
-                  }}
-                >
-                  Send Another
-                </button>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+                    Recommended Next Steps
+                  </div>
+                  <Link 
+                    href="/runway" 
+                    className="btn btn-secondary btn-sm" 
+                    style={{ width: '100%', justifyContent: 'flex-start', background: 'var(--bg-elevated)', border: '1px solid var(--border-primary)' }}
+                  >
+                    📈 Explore Cash Runway Impact
+                  </Link>
+                  <Link 
+                    href="/flow" 
+                    className="btn btn-secondary btn-sm" 
+                    style={{ width: '100%', justifyContent: 'flex-start', background: 'var(--bg-elevated)', border: '1px solid var(--border-primary)' }}
+                  >
+                    🗺️ Analyze Money Flows (Sankey Map)
+                  </Link>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    style={{ width: '100%', marginTop: 4 }}
+                    onClick={() => {
+                      setAmount('');
+                      setRecipient('');
+                      reset();
+                    }}
+                  >
+                    Send Another USDC Transfer
+                  </button>
+                </div>
               </motion.div>
             )}
 

@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 interface WalletEmptyStateProps {
   title: string;
@@ -19,7 +18,9 @@ export function WalletEmptyState({ title, description, svgIcon }: WalletEmptySta
           {description}
         </p>
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <ConnectButton />
+          <button className="btn btn-primary" onClick={() => window.location.reload()}>
+            Initialize Smart Account
+          </button>
         </div>
       </motion.div>
     </div>

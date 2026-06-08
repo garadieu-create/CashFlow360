@@ -5,14 +5,18 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "agent:run": "tsx agent/treasuryAgent.ts",
+    "agent:login": "tsx agent/treasuryAgent.ts --login"
   },
   "dependencies": {
     "@circle-fin/adapter-viem-v2": "^1.11.2",
     "@circle-fin/bridge-kit": "^1.10.2",
+    "@circle-fin/cli": "^0.0.5",
     "@circle-fin/modular-wallets-core": "^1.0.13",
     "@rainbow-me/rainbowkit": "^2.2.4",
     "@tanstack/react-query": "^5.62.0",
+    "@types/sqlite3": "^3.1.11",
     "d3": "^7.9.0",
     "d3-sankey": "^0.12.3",
     "framer-motion": "^11.15.0",
@@ -22,6 +26,7 @@
     "react-dom": "^18",
     "react-hot-toast": "^2.5.2",
     "recharts": "^2.15.0",
+    "sqlite3": "^6.0.1",
     "viem": "^2.22.1",
     "wagmi": "^2.14.9"
   },
@@ -31,6 +36,7 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }

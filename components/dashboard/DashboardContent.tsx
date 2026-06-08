@@ -10,6 +10,7 @@ import { StatGrid } from './StatGrid';
 import { MultiBalanceBar } from './MultiBalanceBar';
 import { OnboardingTour } from '@/components/ui/OnboardingTour';
 import { VaultCard } from './VaultCard';
+import { AgentSettings } from './AgentSettings';
 
 function formatUSD(val: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -185,11 +186,14 @@ export default function DashboardContent() {
         usdcBalance={usdcBalance}
         eurcBalance={eurcBalance}
         nativeBalance={nativeBalance}
-        address={address}
+        address={address || undefined}
       />
 
       {/* Vault Card Deposit/Withdraw Actions */}
       <VaultCard />
+
+      {/* Autonomous Treasury Agent settings and metrics */}
+      <AgentSettings />
 
       {/* Cash Flow Chart + Transaction Table */}
       <div className="grid-2" style={{ marginBottom: 'var(--space-lg)' }}>

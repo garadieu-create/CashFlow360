@@ -1,0 +1,30 @@
+type Deposit @entity {
+  id: ID!
+  from: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+}
+
+type Withdrawal @entity {
+  id: ID!
+  to: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+}
+
+type Transfer @entity {
+  id: ID!
+  from: Bytes!
+  to: Bytes!
+  amount: BigInt!
+  category: String!
+  timestamp: BigInt!
+}
+
+type LowBalanceAlert @entity {
+  id: ID!
+  user: Bytes!
+  balance: BigInt!
+  threshold: BigInt!
+  timestamp: BigInt!
+}

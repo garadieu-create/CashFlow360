@@ -1,0 +1,35 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: CashFlowVault
+    network: arc-testnet
+    source:
+      address: "0x8704caa872Ac721e648DBeB9Fd6FA46C396d6Aad"
+      abi: CashFlowVault
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Deposit
+        - Withdrawal
+        - Transfer
+        - BatchTransfer
+        - AlertThreshold
+        - LowBalanceAlert
+      abis:
+        - name: CashFlowVault
+          file: ./abis/CashFlowVault.json
+      eventHandlers:
+        - event: Deposited(indexed address,uint256,uint256)
+          handler: handleDeposited
+        - event: Withdrawn(indexed address,uint256,uint256)
+          handler: handleWithdrawn
+        - event: Transferred(indexed address,indexed address,uint256,string,uint256)
+          handler: handleTransferred
+        - event: LowBalanceAlert(indexed address,uint256,uint256)
+          handler: handleLowBalanceAlert
+      file: ./src/mapping.ts

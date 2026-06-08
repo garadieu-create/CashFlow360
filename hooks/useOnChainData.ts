@@ -1,12 +1,65 @@
 'use client';
 
-import { useAccount, useBalance, useReadContract, usePublicClient, useWriteContract, useWatchContractEvent } from 'wagmi';
+import { useBalance, useReadContract, usePublicClient, useWatchContractEvent } from 'wagmi';
 import { formatUnits } from 'viem';
 import { USDC_ADDRESS, EURC_ADDRESS, arcTestnet } from '@/lib/arc-config';
 import { USDC_ABI, CASHFLOW_VAULT_ADDRESS, CASHFLOW_VAULT_ABI } from '@/lib/contracts';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { useCircleWallet } from '@/context/CircleWalletContext';
+
+export function useAccount() {
+  const { address, isConnected, isLoading } = useCircleWallet();
+  return { address, isConnected, isConnecting: isLoading };
+}
+
+export function useWriteContract() {
+  const { executeContractWrite } = useCircleWallet();
+  const [isPending, setIsPending] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [isError, setIsError] = useState(false);
+  const [error, setError] = useState<any>(null);
+
+  const writeContractAsync = useCallback(async ({ address, abi, functionName, args }: any) => {
+    setIsPending(true);
+    setIsSuccess(false);
+    setIsError(false);
+    setError(null);
+    try {
+      const hash = await executeContractWrite(address, abi, functionName, args || []);
+      setIsSuccess(true);
+      return hash;
+    } catch (err) {
+      setIsError(true);
+      setError(err);
+      throw err;
+    } finally {
+      setIsPending(false);
+    }
+  }, [executeContractWrite]);
+
+  const writeContract = useCallback(({ address, abi, functionName, args }: any) => {
+    writeContractAsync({ address, abi, functionName, args }).catch(() => {});
+  }, [writeContractAsync]);
+
+  return {
+    writeContract,
+    writeContractAsync,
+    isPending,
+    isSuccess,
+    isError,
+    error,
+    status: isPending ? 'pending' : isSuccess ? 'success' : isError ? 'error' : 'idle',
+    data: null as any,
+    reset: () => {
+      setIsPending(false);
+      setIsSuccess(false);
+      setIsError(false);
+      setError(null);
+    }
+  };
+}
 
 // USDC on Arc has 6 decimals for ERC-20 interface
 const USDC_DECIMALS = 6;

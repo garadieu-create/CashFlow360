@@ -1,7 +1,7 @@
 'use client';
 
 import { useAccount } from 'wagmi';
-import { useUSDCBalance, useEURCBalance, useNativeBalance, useTransactionHistory, useCashFlowMetrics } from '@/hooks/useOnChainData';
+import { useUSDCBalance, useVaultBalance, useEURCBalance, useNativeBalance, useTransactionHistory, useCashFlowMetrics } from '@/hooks/useOnChainData';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Activity, DollarSign, RefreshCw } from 'lucide-react';
@@ -11,6 +11,7 @@ import { WalletEmptyState } from '@/components/ui/WalletEmptyState';
 import { StatGrid } from './StatGrid';
 import { MultiBalanceBar } from './MultiBalanceBar';
 import { OnboardingTour } from '@/components/ui/OnboardingTour';
+import { VaultCard } from './VaultCard';
 
 function formatUSD(val: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -24,6 +25,7 @@ function formatUSD(val: number): string {
 export default function DashboardContent() {
   const { address, isConnected } = useAccount();
   const { formatted: usdcBalance, isLoading: loadingUSDC, refetch: refetchBalance } = useUSDCBalance();
+  const { formatted: vaultUSDCBalance, refetch: refetchVaultBalance } = useVaultBalance();
   const { formatted: eurcBalance } = useEURCBalance();
   const { formatted: nativeBalance } = useNativeBalance();
   const { transactions, isLoading: loadingTx, refetch: refetchTx } = useTransactionHistory();
@@ -54,6 +56,7 @@ export default function DashboardContent() {
 
   const handleRefresh = () => {
     refetchBalance();
+    refetchVaultBalance();
     refetchTx();
   };
 
@@ -186,6 +189,9 @@ export default function DashboardContent() {
         nativeBalance={nativeBalance}
         address={address}
       />
+
+      {/* Vault Card Deposit/Withdraw Actions */}
+      <VaultCard />
 
       {/* Cash Flow Chart + Transaction Table */}
       <div className="grid-2" style={{ marginBottom: 'var(--space-lg)' }}>

@@ -15,13 +15,27 @@ pragma solidity ^0.8.20;
  * - User-Controlled Wallets (RainbowKit wallet connection)
  */
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+interface IERC20 {
+    function transfer(address to, uint256 value) external returns (bool);
+    function transferFrom(address from, address to, uint256 value) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
 
-contract CashFlowVault is Ownable, ReentrancyGuard {
-    using SafeERC20 for IERC20;
+contract CashFlowVault {
+    address public owner;
+    bool private _locked;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Ownable: caller is not the owner");
+        _;
+    }
+
+    modifier nonReentrant() {
+        require(!_locked, "ReentrancyGuard: reentrant call");
+        _locked = true;
+        _;
+        _locked = false;
+    }
 
     IERC20 public immutable usdc;
 
@@ -65,7 +79,8 @@ contract CashFlowVault is Ownable, ReentrancyGuard {
     event AlertThresholdSet(address indexed user, uint256 threshold);
     event LowBalanceAlert(address indexed user, uint256 balance, uint256 threshold);
 
-    constructor(address _usdc) Ownable(msg.sender) {
+    constructor(address _usdc) {
+        owner = msg.sender;
         usdc = IERC20(_usdc);
     }
 
@@ -76,7 +91,7 @@ contract CashFlowVault is Ownable, ReentrancyGuard {
     function deposit(uint256 amount) external nonReentrant {
         require(amount > 0, "Amount must be positive");
 
-        usdc.safeTransferFrom(msg.sender, address(this), amount);
+        require(usdc.transferFrom(msg.sender, address(this), amount), "USDC transferFrom failed");
         vaultBalances[msg.sender] += amount;
 
         uint256 txId = transactions.length;
@@ -102,7 +117,7 @@ contract CashFlowVault is Ownable, ReentrancyGuard {
         require(vaultBalances[msg.sender] >= amount, "Insufficient balance");
 
         vaultBalances[msg.sender] -= amount;
-        usdc.safeTransfer(msg.sender, amount);
+        require(usdc.transfer(msg.sender, amount), "USDC transfer failed");
 
         uint256 txId = transactions.length;
         transactions.push(Transaction({
@@ -137,7 +152,7 @@ contract CashFlowVault is Ownable, ReentrancyGuard {
         require(vaultBalances[msg.sender] >= amount, "Insufficient balance");
 
         vaultBalances[msg.sender] -= amount;
-        usdc.safeTransfer(to, amount);
+        require(usdc.transfer(to, amount), "USDC transfer failed");
 
         uint256 txId = transactions.length;
         transactions.push(Transaction({
@@ -180,7 +195,7 @@ contract CashFlowVault is Ownable, ReentrancyGuard {
 
         for (uint256 i = 0; i < recipients.length; i++) {
             require(recipients[i] != address(0), "Invalid recipient");
-            usdc.safeTransfer(recipients[i], amounts[i]);
+            require(usdc.transfer(recipients[i], amounts[i]), "USDC transfer failed");
 
             uint256 txId = transactions.length;
             transactions.push(Transaction({

@@ -3,7 +3,7 @@
 import { useAccount, useUSDCBalance } from '@/hooks/useOnChainData';
 import { motion } from 'framer-motion';
 import { Radar, Globe, ArrowRightLeft, Shield } from 'lucide-react';
-import { sepolia, baseSepolia, arbitrumSepolia } from 'wagmi/chains';
+import { sepolia, baseSepolia, arbitrumSepolia } from 'viem/chains';
 import { arcTestnet, USDC_ADDRESS } from '@/lib/arc-config';
 import { USDC_ABI } from '@/lib/contracts';
 import { useReadContract } from 'wagmi';

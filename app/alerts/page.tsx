@@ -18,8 +18,11 @@ import {
   Pause,
   AlertCircle
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { useAccount } from 'wagmi';
+import { useVaultAlerts } from '@/hooks/useOnChainData';
+import { parseUnits } from 'viem';
 
 interface AlertRule {
   id: number;
@@ -38,6 +41,9 @@ const initialAlertRules: AlertRule[] = [
 ];
 
 export default function AlertsPage() {
+  const { isConnected } = useAccount();
+  const { threshold, formatted: contractThresholdStr, isLoading: loadingThreshold, setAlertThresholdAsync, refetch } = useVaultAlerts();
+
   const [rules, setRules] = useState<AlertRule[]>(initialAlertRules);
   const [activeRule, setActiveRule] = useState<AlertRule | null>(null);
   
@@ -49,8 +55,25 @@ export default function AlertsPage() {
   // Form states
   const [ruleType, setRuleType] = useState('Low Balance');
   const [condition, setCondition] = useState('USDC balance < $500');
+  const [thresholdInput, setThresholdInput] = useState('1000');
   const [severity, setSeverity] = useState<'critical' | 'warning' | 'info'>('warning');
   const [status, setStatus] = useState<'active' | 'paused'>('active');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Sync threshold from contract
+  useEffect(() => {
+    if (isConnected && contractThresholdStr) {
+      setRules(prev => prev.map(r => {
+        if (r.type === 'Low Balance') {
+          return {
+            ...r,
+            condition: `USDC balance < $${parseFloat(contractThresholdStr).toLocaleString('en-US')}`
+          };
+        }
+        return r;
+      }));
+    }
+  }, [contractThresholdStr, isConnected]);
 
   const handleToggleStatus = (id: number) => {
     setRules(prev => prev.map(r => {
@@ -66,21 +89,42 @@ export default function AlertsPage() {
   const openCreateModal = () => {
     setRuleType('Low Balance');
     setCondition('USDC balance < $1,000');
+    setThresholdInput(contractThresholdStr || '1000');
     setSeverity('critical');
     setStatus('active');
     setIsCreateOpen(true);
   };
 
-  const handleCreateRule = (e: React.FormEvent) => {
+  const handleCreateRule = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!condition) {
-      toast.error('Please specify a condition rule.');
-      return;
+    if (ruleType === 'Low Balance') {
+      if (!thresholdInput || parseFloat(thresholdInput) < 0) {
+        toast.error('Please enter a valid threshold amount.');
+        return;
+      }
+      setIsSubmitting(true);
+      const toastId = toast.loading('Setting alert threshold on-chain...');
+      try {
+        await setAlertThresholdAsync(parseUnits(thresholdInput, 6));
+        toast.success('On-chain alert threshold set!', { id: toastId });
+        refetch();
+      } catch (err: any) {
+        toast.error(err.message || 'Transaction failed.', { id: toastId });
+        setIsSubmitting(false);
+        return;
+      }
+      setIsSubmitting(false);
+    } else {
+      if (!condition) {
+        toast.error('Please specify a condition rule.');
+        return;
+      }
     }
+
     const newRule: AlertRule = {
       id: Date.now(),
       type: ruleType,
-      condition,
+      condition: ruleType === 'Low Balance' ? `USDC balance < $${parseFloat(thresholdInput).toLocaleString('en-US')}` : condition,
       severity,
       status,
     };
@@ -95,19 +139,41 @@ export default function AlertsPage() {
     setCondition(rule.condition);
     setSeverity(rule.severity);
     setStatus(rule.status);
+    if (rule.type === 'Low Balance') {
+      setThresholdInput(contractThresholdStr || '1000');
+    }
     setIsEditOpen(true);
   };
 
-  const handleEditRule = (e: React.FormEvent) => {
+  const handleEditRule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeRule) return;
     
+    if (ruleType === 'Low Balance') {
+      if (!thresholdInput || parseFloat(thresholdInput) < 0) {
+        toast.error('Please enter a valid threshold amount.');
+        return;
+      }
+      setIsSubmitting(true);
+      const toastId = toast.loading('Updating alert threshold on-chain...');
+      try {
+        await setAlertThresholdAsync(parseUnits(thresholdInput, 6));
+        toast.success('On-chain alert threshold updated!', { id: toastId });
+        refetch();
+      } catch (err: any) {
+        toast.error(err.message || 'Transaction failed.', { id: toastId });
+        setIsSubmitting(false);
+        return;
+      }
+      setIsSubmitting(false);
+    }
+
     setRules(prev => prev.map(r => {
       if (r.id === activeRule.id) {
         return {
           ...r,
           type: ruleType,
-          condition,
+          condition: ruleType === 'Low Balance' ? `USDC balance < $${parseFloat(thresholdInput).toLocaleString('en-US')}` : condition,
           severity,
           status,
         };
@@ -269,20 +335,36 @@ export default function AlertsPage() {
                     <option value="Runway Alert">Runway Alert</option>
                   </select>
                 </div>
-                <div className="input-group">
-                  <label className="input-label">Condition (Expression)</label>
-                  <input 
-                    type="text" 
-                    className="input input-mono" 
-                    value={condition} 
-                    onChange={(e) => setCondition(e.target.value)} 
-                    placeholder="e.g. USDC balance < $1,000"
-                    required
-                  />
-                </div>
+                {ruleType === 'Low Balance' ? (
+                  <div className="input-group">
+                    <label className="input-label">Threshold Amount (USDC)</label>
+                    <input 
+                      type="number" 
+                      className="input input-mono" 
+                      value={thresholdInput} 
+                      onChange={(e) => setThresholdInput(e.target.value)} 
+                      placeholder="e.g. 1000"
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                ) : (
+                  <div className="input-group">
+                    <label className="input-label">Condition (Expression)</label>
+                    <input 
+                      type="text" 
+                      className="input input-mono" 
+                      value={condition} 
+                      onChange={(e) => setCondition(e.target.value)} 
+                      placeholder="e.g. USDC balance < $1,000"
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                )}
                 <div className="input-group">
                   <label className="input-label">Severity Level</label>
-                  <select className="input" value={severity} onChange={(e) => setSeverity(e.target.value as any)}>
+                  <select className="input" value={severity} onChange={(e) => setSeverity(e.target.value as any)} disabled={isSubmitting}>
                     <option value="info">Info</option>
                     <option value="warning">Warning</option>
                     <option value="critical">Critical</option>
@@ -290,17 +372,17 @@ export default function AlertsPage() {
                 </div>
                 <div className="input-group">
                   <label className="input-label">Initial Status</label>
-                  <select className="input" value={status} onChange={(e) => setStatus(e.target.value as any)}>
+                  <select className="input" value={status} onChange={(e) => setStatus(e.target.value as any)} disabled={isSubmitting}>
                     <option value="active">Active (Enabled)</option>
                     <option value="paused">Paused (Disabled)</option>
                   </select>
                 </div>
                 <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                  <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setIsCreateOpen(false)}>
+                  <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setIsCreateOpen(false)} disabled={isSubmitting}>
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
-                    Create Rule
+                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={isSubmitting}>
+                    {isSubmitting ? 'Confirming...' : 'Create Rule'}
                   </button>
                 </div>
               </form>
@@ -348,20 +430,36 @@ export default function AlertsPage() {
                     <option value="Runway Alert">Runway Alert</option>
                   </select>
                 </div>
-                <div className="input-group">
-                  <label className="input-label">Condition (Expression)</label>
-                  <input 
-                    type="text" 
-                    className="input input-mono" 
-                    value={condition} 
-                    onChange={(e) => setCondition(e.target.value)} 
-                    placeholder="e.g. USDC balance < $1,000"
-                    required
-                  />
-                </div>
+                {ruleType === 'Low Balance' ? (
+                  <div className="input-group">
+                    <label className="input-label">Threshold Amount (USDC)</label>
+                    <input 
+                      type="number" 
+                      className="input input-mono" 
+                      value={thresholdInput} 
+                      onChange={(e) => setThresholdInput(e.target.value)} 
+                      placeholder="e.g. 1000"
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                ) : (
+                  <div className="input-group">
+                    <label className="input-label">Condition (Expression)</label>
+                    <input 
+                      type="text" 
+                      className="input input-mono" 
+                      value={condition} 
+                      onChange={(e) => setCondition(e.target.value)} 
+                      placeholder="e.g. USDC balance < $1,000"
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                )}
                 <div className="input-group">
                   <label className="input-label">Severity Level</label>
-                  <select className="input" value={severity} onChange={(e) => setSeverity(e.target.value as any)}>
+                  <select className="input" value={severity} onChange={(e) => setSeverity(e.target.value as any)} disabled={isSubmitting}>
                     <option value="info">Info</option>
                     <option value="warning">Warning</option>
                     <option value="critical">Critical</option>
@@ -369,17 +467,17 @@ export default function AlertsPage() {
                 </div>
                 <div className="input-group">
                   <label className="input-label">Status</label>
-                  <select className="input" value={status} onChange={(e) => setStatus(e.target.value as any)}>
+                  <select className="input" value={status} onChange={(e) => setStatus(e.target.value as any)} disabled={isSubmitting}>
                     <option value="active">Active (Enabled)</option>
                     <option value="paused">Paused (Disabled)</option>
                   </select>
                 </div>
                 <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                  <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setIsEditOpen(false)}>
+                  <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setIsEditOpen(false)} disabled={isSubmitting}>
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
-                    Save Changes
+                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={isSubmitting}>
+                    {isSubmitting ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </form>

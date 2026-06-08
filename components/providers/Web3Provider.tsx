@@ -7,8 +7,14 @@ import { wagmiConfig } from '@/lib/wagmi-config';
 import '@rainbow-me/rainbowkit/styles.css';
 import { ModalProvider } from '@/context/ModalContext';
 import { GlobalModal } from '@/components/ui/GlobalModal';
+import { useLowBalanceWatcher } from '@/hooks/useOnChainData';
 
 const queryClient = new QueryClient();
+
+function LowBalanceWatcher() {
+  useLowBalanceWatcher();
+  return null;
+}
 
 export function Web3Provider({ children }: { children: React.ReactNode }) {
   return (
@@ -25,6 +31,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
           initialChain={wagmiConfig.chains[0]}
         >
           <ModalProvider>
+            <LowBalanceWatcher />
             {children}
             <GlobalModal />
           </ModalProvider>

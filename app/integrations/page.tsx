@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, ExternalLink, Settings, ShieldAlert, Sparkles, X, Check, Server } from 'lucide-react';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import { ApiCredentials } from '@/components/dashboard/ApiCredentials';
 
 interface Integration {
   id: string;
@@ -212,6 +213,9 @@ export default function IntegrationsPage() {
                 </motion.div>
               ))}
             </div>
+
+            {/* x402 Gateway Nanopayments API Monetization */}
+            <ApiCredentials />
 
             {/* Circle Product Feedback */}
             <motion.div

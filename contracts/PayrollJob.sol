@@ -84,8 +84,8 @@ contract PayrollJob {
         require(job.status == JobStatus.FUNDED, "Job not funded");
         require(msg.sender == job.client || msg.sender == owner, "Only client or owner can release");
 
-        require(usdc.transfer(job.contractor, job.paymentAmount), "USDC transfer failed");
         job.status = JobStatus.SETTLED;
+        require(usdc.transfer(job.contractor, job.paymentAmount), "USDC transfer failed");
 
         emit JobSettled(jobId, job.contractor, job.paymentAmount);
     }
@@ -101,6 +101,28 @@ contract PayrollJob {
 
         job.status = JobStatus.DISPUTED;
         emit JobDisputed(jobId, msg.sender);
+    }
+
+    /**
+     * @notice Resolve a dispute in favor of either client or contractor
+     * @param jobId ID of the job
+     * @param resolveToContractor True to release payment to contractor, false to refund client
+     */
+    function resolveDispute(uint256 jobId, bool resolveToContractor) external {
+        require(msg.sender == owner, "Only owner can resolve disputes");
+        require(jobId < jobs.length, "Job does not exist");
+        Job storage job = jobs[jobId];
+        require(job.status == JobStatus.DISPUTED, "Job not in DISPUTED status");
+
+        job.status = JobStatus.SETTLED;
+
+        if (resolveToContractor) {
+            require(usdc.transfer(job.contractor, job.paymentAmount), "USDC transfer failed");
+            emit JobSettled(jobId, job.contractor, job.paymentAmount);
+        } else {
+            require(usdc.transfer(job.client, job.paymentAmount), "USDC transfer failed");
+            emit JobSettled(jobId, job.client, job.paymentAmount);
+        }
     }
 
     function getJobsCount() external view returns (uint256) {

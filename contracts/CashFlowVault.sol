@@ -215,6 +215,7 @@ contract CashFlowVault {
     }
 
     function approveAndExecuteRequest(uint256 requestId) external nonReentrant {
+        require(coSigner != owner, "Distinct co-signer not set");
         require(requestId < multiSigRequests.length, "Invalid request ID");
         MultiSigRequest storage req = multiSigRequests[requestId];
         require(!req.executed, "Request already executed");

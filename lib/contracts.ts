@@ -1,4 +1,4 @@
-export const CASHFLOW_VAULT_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
+export const CASHFLOW_VAULT_ADDRESS = '0x8704caa872Ac721e648DBeB9Fd6FA46C396d6Aad' as const;
 
 export const CASHFLOW_VAULT_ABI = [
   {
@@ -39,6 +39,20 @@ export const CASHFLOW_VAULT_ABI = [
   },
   {
     type: 'function',
+    name: 'setAlertThreshold',
+    inputs: [{ name: 'threshold', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'lowBalanceThreshold',
+    inputs: [{ name: '', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'getVaultBalance',
     inputs: [{ name: 'owner', type: 'address' }],
     outputs: [{ name: '', type: 'uint256' }],
@@ -48,6 +62,20 @@ export const CASHFLOW_VAULT_ABI = [
     type: 'function',
     name: 'getTransactionCount',
     inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getUserTransactionIds',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getTotalTransactions',
+    inputs: [],
     outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -103,6 +131,23 @@ export const CASHFLOW_VAULT_ABI = [
       { name: 'totalAmount', type: 'uint256', indexed: false },
       { name: 'recipientCount', type: 'uint256', indexed: false },
       { name: 'timestamp', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'AlertThresholdSet',
+    inputs: [
+      { name: 'user', type: 'address', indexed: true },
+      { name: 'threshold', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'LowBalanceAlert',
+    inputs: [
+      { name: 'user', type: 'address', indexed: true },
+      { name: 'balance', type: 'uint256', indexed: false },
+      { name: 'threshold', type: 'uint256', indexed: false },
     ],
   },
 ] as const;

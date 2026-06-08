@@ -1,9 +1,7 @@
 'use client';
 
-import { useAccount } from 'wagmi';
-import { useTransactionHistory, useCashFlowMetrics } from '@/hooks/useOnChainData';
+import { useAccount, useTransactionHistory, useCashFlowMetrics } from '@/hooks/useOnChainData';
 import { motion } from 'framer-motion';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 import SankeyDiagram from './SankeyDiagram';
 import { RefreshCw } from 'lucide-react';
 import { WalletEmptyState } from '@/components/ui/WalletEmptyState';

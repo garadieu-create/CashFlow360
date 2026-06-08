@@ -3,8 +3,8 @@
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAccount, useSwitchChain, useWriteContract, useConnectorClient, useSignTypedData } from 'wagmi';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useSwitchChain, useConnectorClient, useSignTypedData } from 'wagmi';
+import { useAccount, useWriteContract } from '@/hooks/useOnChainData';
 import { ArrowUpDown, ExternalLink, Info, Shield, CheckCircle2, AlertCircle, RefreshCw, Layers, Zap } from 'lucide-react';
 import { WalletEmptyState } from '@/components/ui/WalletEmptyState';
 import { useState, useEffect } from 'react';

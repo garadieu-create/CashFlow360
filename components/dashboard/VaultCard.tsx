@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
+import { useWaitForTransactionReceipt, useReadContract } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
 import { USDC_ADDRESS } from '@/lib/arc-config';
 import { USDC_ABI, CASHFLOW_VAULT_ADDRESS } from '@/lib/contracts';
-import { useUSDCBalance, useVaultBalance, useVaultOperations } from '@/hooks/useOnChainData';
+import { useUSDCBalance, useVaultBalance, useVaultOperations, useAccount, useWriteContract } from '@/hooks/useOnChainData';
 import { motion } from 'framer-motion';
 import { ArrowUp, ArrowDown, Lock, Wallet, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';

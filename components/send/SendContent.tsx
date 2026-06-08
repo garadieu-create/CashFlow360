@@ -1,12 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits } from 'viem';
 import { USDC_ADDRESS, getExplorerTxUrl } from '@/lib/arc-config';
-import { useUSDCBalance, useVaultOperations, useVaultBalance } from '@/hooks/useOnChainData';
+import { useUSDCBalance, useVaultOperations, useVaultBalance, useAccount, useWriteContract } from '@/hooks/useOnChainData';
 import { motion } from 'framer-motion';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Send, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
@@ -60,7 +59,9 @@ export default function SendContent() {
           <p className="empty-state-text" style={{ marginBottom: '24px' }}>
             Send USDC to any address on Arc Testnet using Circle App Kit Send.
           </p>
-          <ConnectButton />
+          <button className="btn btn-primary" onClick={() => window.location.reload()}>
+            Initialize Smart Account
+          </button>
         </motion.div>
       </div>
     );

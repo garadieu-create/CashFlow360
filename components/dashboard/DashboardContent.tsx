@@ -1,8 +1,6 @@
 'use client';
 
-import { useAccount } from 'wagmi';
-import { useUSDCBalance, useVaultBalance, useEURCBalance, useNativeBalance, useTransactionHistory, useCashFlowMetrics } from '@/hooks/useOnChainData';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useUSDCBalance, useVaultBalance, useEURCBalance, useNativeBalance, useTransactionHistory, useCashFlowMetrics, useAccount } from '@/hooks/useOnChainData';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Activity, DollarSign, RefreshCw } from 'lucide-react';
 import CashFlowChart from './CashFlowChart';

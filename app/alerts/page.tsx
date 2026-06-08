@@ -20,8 +20,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { useAccount } from 'wagmi';
-import { useVaultAlerts } from '@/hooks/useOnChainData';
+import { useVaultAlerts, useAccount } from '@/hooks/useOnChainData';
 import { parseUnits } from 'viem';
 
 interface AlertRule {

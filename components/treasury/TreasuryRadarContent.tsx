@@ -1,9 +1,7 @@
 'use client';
 
-import { useAccount, useBalance } from 'wagmi';
-import { useUSDCBalance } from '@/hooks/useOnChainData';
+import { useAccount, useUSDCBalance } from '@/hooks/useOnChainData';
 import { motion } from 'framer-motion';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Radar, Globe, ArrowRightLeft, Shield } from 'lucide-react';
 import { sepolia, baseSepolia, arbitrumSepolia } from 'wagmi/chains';
 import { arcTestnet, USDC_ADDRESS } from '@/lib/arc-config';

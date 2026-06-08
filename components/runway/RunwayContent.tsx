@@ -1,9 +1,7 @@
 'use client';
 
-import { useAccount } from 'wagmi';
-import { useUSDCBalance, useTransactionHistory, useCashFlowMetrics } from '@/hooks/useOnChainData';
+import { useUSDCBalance, useTransactionHistory, useCashFlowMetrics, useAccount } from '@/hooks/useOnChainData';
 import { motion } from 'framer-motion';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useState, useMemo } from 'react';
 import { TrendingDown, AlertTriangle, Shield, Fuel, DollarSign } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
@@ -108,7 +106,9 @@ export default function RunwayContent() {
           <p className="empty-state-text" style={{ marginBottom: '24px' }}>
             Calculate your SME cash runway based on real on-chain transaction patterns.
           </p>
-          <ConnectButton />
+          <button className="btn btn-primary" onClick={() => window.location.reload()}>
+            Initialize Smart Account
+          </button>
         </motion.div>
       </div>
     );

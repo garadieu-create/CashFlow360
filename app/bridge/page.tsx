@@ -3,16 +3,61 @@
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAccount } from 'wagmi';
+import { useAccount, useSwitchChain, useWriteContract, useConnectorClient } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { ArrowUpDown, ExternalLink, Info, Shield, CheckCircle2, AlertCircle, RefreshCw, Layers, Zap } from 'lucide-react';
 import { WalletEmptyState } from '@/components/ui/WalletEmptyState';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import { createAdapterFromProvider } from "@circle-fin/adapter-viem-v2";
+import { BridgeKit, EthereumSepolia, BaseSepolia, ArbitrumSepolia, ArcTestnet } from "@circle-fin/bridge-kit";
+import { createPublicClient, http, parseUnits, formatUnits, keccak256, parseEventLogs } from 'viem';
+import { sepolia, baseSepolia, arbitrumSepolia } from 'wagmi/chains';
+
+const SOURCE_CHAINS: Record<string, {
+  id: number;
+  name: string;
+  usdc: `0x${string}`;
+  tokenMessenger: `0x${string}`;
+  messageTransmitter: `0x${string}`;
+  explorer: string;
+  domain: number;
+}> = {
+  sepolia: {
+    id: 11155111,
+    name: 'Ethereum Sepolia',
+    usdc: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+    tokenMessenger: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5',
+    messageTransmitter: '0x7865fAfC2db2093669d92c0F33AeEF291086BEFD',
+    explorer: 'https://sepolia.etherscan.io',
+    domain: 0
+  },
+  base: {
+    id: 84532,
+    name: 'Base Sepolia',
+    usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+    tokenMessenger: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5',
+    messageTransmitter: '0x7865fAfC2db2093669d92c0F33AeEF291086BEFD',
+    explorer: 'https://sepolia.basescan.org',
+    domain: 6
+  },
+  arbitrum: {
+    id: 421614,
+    name: 'Arbitrum Sepolia',
+    usdc: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
+    tokenMessenger: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5',
+    messageTransmitter: '0x7865fAfC2db2093669d92c0F33AeEF291086BEFD',
+    explorer: 'https://sepolia.arbiscan.io',
+    domain: 3
+  }
+};
 
 export default function BridgePage() {
   const { isConnected, address } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
+  const { writeContractAsync } = useWriteContract();
+  const { data: connectorClient } = useConnectorClient();
 
   // Bridge States
   const [sourceChain, setSourceChain] = useState('sepolia');
@@ -49,40 +94,260 @@ export default function BridgePage() {
       return;
     }
 
+    if (!address) {
+      toast.error('Please connect your wallet first.');
+      return;
+    }
+
+    const sourceConfig = SOURCE_CHAINS[sourceChain];
+    if (!sourceConfig) {
+      toast.error('Unsupported source chain selected.');
+      return;
+    }
+
     setBridgeLogs([]);
-    const txHash = getSimulatedTxHash();
-    setBridgeTxHash(txHash);
-
-    // 1. Approving
-    setBridgeStep('approve');
     addLog(`Initiating USDC bridge request for $${parseFloat(bridgeAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
-    addLog(`Requesting approval for Circle TokenMessenger on ${sourceChain === 'sepolia' ? 'Ethereum Sepolia' : sourceChain === 'base' ? 'Base Sepolia' : 'Arbitrum Sepolia'}...`);
-    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // 2. Burning
-    setBridgeStep('burn');
-    addLog(`USDC spending approved! Confirmed in wallet.`);
-    addLog(`Broadcasting CCTP burn transaction: depositForBurn()...`);
-    await new Promise(resolve => setTimeout(resolve, 2500));
+    try {
+      addLog(`Querying USDC balance on ${sourceConfig.name}...`);
+      
+      const chainMap: Record<string, any> = {
+        sepolia: sepolia,
+        base: baseSepolia,
+        arbitrum: arbitrumSepolia
+      };
+      const viemChain = chainMap[sourceChain];
 
-    // 3. Attesting
-    setBridgeStep('attest');
-    addLog(`CCTP Burn Confirmed! Transaction: ${txHash.slice(0, 16)}...`);
-    addLog(`Pinging Circle Attestation API to request signature...`);
-    addLog(`Waiting for Ethereum block confirmation consensus (2/2)...`);
-    await new Promise(resolve => setTimeout(resolve, 3000));
+      const publicClient = createPublicClient({
+        chain: viemChain,
+        transport: http()
+      });
 
-    // 4. Minting
-    setBridgeStep('mint');
-    addLog(`Circle Attestation signature successfully generated!`);
-    addLog(`Submitting claim transaction on Arc Testnet via receiveMessage()...`);
-    await new Promise(resolve => setTimeout(resolve, 2000));
+      const balance = await publicClient.readContract({
+        address: sourceConfig.usdc,
+        abi: [
+          {
+            type: 'function',
+            name: 'balanceOf',
+            inputs: [{ name: 'account', type: 'address' }],
+            outputs: [{ name: '', type: 'uint256' }],
+            stateMutability: 'view'
+          }
+        ],
+        functionName: 'balanceOf',
+        args: [address]
+      });
 
-    // 5. Success
-    setBridgeStep('success');
-    addLog(`USDC successfully minted on Arc Testnet!`);
-    addLog(`Treasury balance updated.`);
-    toast.success('USDC successfully bridged via Circle CCTP!');
+      const parsedAmount = parseUnits(bridgeAmount, 6);
+      const balanceFormatted = formatUnits(balance, 6);
+      addLog(`USDC Balance on ${sourceConfig.name}: ${balanceFormatted} USDC`);
+
+      if (balance < parsedAmount) {
+        throw new Error(`Insufficient USDC balance on source chain (have ${balanceFormatted} USDC, need ${bridgeAmount} USDC).`);
+      }
+
+      addLog(`Checking active wallet chain...`);
+      if (connectorClient?.chain?.id !== sourceConfig.id) {
+        addLog(`Switching wallet to ${sourceConfig.name}...`);
+        await switchChainAsync({ chainId: sourceConfig.id });
+      }
+
+      setBridgeStep('approve');
+      addLog(`Checking USDC allowance for TokenMessenger...`);
+      const allowance = await publicClient.readContract({
+        address: sourceConfig.usdc,
+        abi: [
+          {
+            type: 'function',
+            name: 'allowance',
+            inputs: [
+              { name: 'owner', type: 'address' },
+              { name: 'spender', type: 'address' }
+            ],
+            outputs: [{ name: '', type: 'uint256' }],
+            stateMutability: 'view'
+          }
+        ],
+        functionName: 'allowance',
+        args: [address, sourceConfig.tokenMessenger]
+      });
+
+      if (allowance < parsedAmount) {
+        addLog(`USDC allowance of ${formatUnits(allowance, 6)} USDC is insufficient.`);
+        addLog(`Requesting approval for TokenMessenger (${sourceConfig.tokenMessenger})...`);
+        
+        const approveTxHash = await writeContractAsync({
+          address: sourceConfig.usdc,
+          abi: [
+            {
+              type: 'function',
+              name: 'approve',
+              inputs: [
+                { name: 'spender', type: 'address' },
+                { name: 'amount', type: 'uint256' }
+              ],
+              outputs: [{ name: '', type: 'bool' }],
+              stateMutability: 'nonpayable'
+            }
+          ],
+          functionName: 'approve',
+          args: [sourceConfig.tokenMessenger, parsedAmount]
+        });
+        
+        addLog(`Approval transaction submitted: ${approveTxHash}`);
+        addLog(`Waiting for approval confirmation...`);
+        await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
+        addLog(`Approval confirmed!`);
+      } else {
+        addLog(`USDC allowance is sufficient: ${formatUnits(allowance, 6)} USDC. Skipping approval step.`);
+      }
+
+      setBridgeStep('burn');
+      addLog(`Initiating CCTP burn transaction via BridgeKit...`);
+
+      const provider = connectorClient?.transport?.value?.provider || (window as any).ethereum;
+      if (!provider) {
+        throw new Error("No web3 provider found in connector client.");
+      }
+
+      const adapter = await createAdapterFromProvider({ provider });
+      const kit = new BridgeKit();
+      const cctpProvider = kit.providers[0];
+
+            const sourceChainMapped = sourceChain === 'sepolia' ? EthereumSepolia : sourceChain === 'base' ? BaseSepolia : ArbitrumSepolia;
+
+      const preparedBurn = await cctpProvider.burn({
+        source: { adapter, chain: sourceChainMapped, address },
+        destination: { adapter, chain: ArcTestnet, address },
+        amount: bridgeAmount,
+        token: 'USDC',
+        config: { transferSpeed: 'FAST' }
+      });
+
+      addLog(`Broadcasting CCTP burn transaction: depositForBurn()...`);
+      const burnTxHash = await preparedBurn.execute();
+      setBridgeTxHash(burnTxHash);
+      addLog(`CCTP Burn transaction submitted: ${burnTxHash}`);
+      addLog(`Waiting for burn confirmation on ${sourceConfig.name}...`);
+      const burnReceipt = await publicClient.waitForTransactionReceipt({ hash: burnTxHash as `0x${string}` });
+      addLog(`CCTP Burn Confirmed! Block: ${burnReceipt.blockNumber}`);
+
+      setBridgeStep('attest');
+      addLog(`Extracting message bytes from burn logs...`);
+
+      const MESSAGE_TRANSMITTER_ABI = [
+        {
+          type: 'event',
+          name: 'MessageSent',
+          inputs: [
+            { name: 'message', type: 'bytes', indexed: false }
+          ]
+        }
+      ] as const;
+
+      const logs = parseEventLogs({
+        abi: MESSAGE_TRANSMITTER_ABI,
+        eventName: 'MessageSent',
+        logs: burnReceipt.logs
+      });
+
+      if (logs.length === 0) {
+        throw new Error('MessageSent event not found in burn transaction logs.');
+      }
+
+      const messageBytes = logs[0].args.message;
+      const messageHash = keccak256(messageBytes);
+      addLog(`Message Hash: ${messageHash}`);
+      addLog(`Pinging Circle Attestation API to request signature...`);
+
+      let attestation = '';
+      let status = 'pending';
+      let attempts = 0;
+      const maxAttempts = 120;
+
+      while (status !== 'complete' && attempts < maxAttempts) {
+        attempts++;
+        addLog(`Polling Circle Attestation API (Attempt ${attempts}/${maxAttempts})...`);
+        try {
+          const response = await fetch(`https://iris-api-sandbox.circle.com/v1/attestations/${messageHash}`);
+          if (response.ok) {
+            const data = await response.json();
+            status = data.status;
+            if (status === 'complete') {
+              attestation = data.attestation;
+              addLog(`Circle Attestation signature successfully generated!`);
+            } else {
+              addLog(`Attestation pending: ${data.message || 'Circle consensus in progress...'}`);
+            }
+          } else {
+            addLog(`Attestation API returned status: ${response.status}. Retrying...`);
+          }
+        } catch (err) {
+          addLog(`Error querying Attestation API. Retrying...`);
+        }
+        
+        if (status !== 'complete') {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+      }
+
+      if (status !== 'complete') {
+        throw new Error('Circle Attestation polling timed out.');
+      }
+
+      setBridgeStep('mint');
+      addLog(`Switching wallet chain to Arc Testnet (Chain ID: 5042002)...`);
+      await switchChainAsync({ chainId: 5042002 });
+
+      addLog(`Connected to Arc Testnet. Submitting claim transaction via receiveMessage()...`);
+
+      const receiveTxHash = await writeContractAsync({
+        address: '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275',
+        abi: [
+          {
+            type: 'function',
+            name: 'receiveMessage',
+            inputs: [
+              { name: 'message', type: 'bytes' },
+              { name: 'attestation', type: 'bytes' }
+            ],
+            outputs: [
+              { name: '', type: 'bool' }
+            ],
+            stateMutability: 'nonpayable'
+          }
+        ],
+        functionName: 'receiveMessage',
+        args: [messageBytes, attestation as `0x${string}`]
+      });
+
+      addLog(`Mint transaction submitted: ${receiveTxHash}`);
+      addLog(`Waiting for mint transaction confirmation on Arc Testnet...`);
+
+      const arcPublicClient = createPublicClient({
+        chain: {
+          id: 5042002,
+          name: 'Arc Testnet',
+          nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+          rpcUrls: { default: { http: ['https://rpc.testnet.arc.network'] } }
+        },
+        transport: http()
+      });
+
+      const mintReceipt = await arcPublicClient.waitForTransactionReceipt({ hash: receiveTxHash });
+      addLog(`USDC successfully minted on Arc Testnet! Block: ${mintReceipt.blockNumber}`);
+
+      setBridgeTxHash(receiveTxHash);
+      setBridgeStep('success');
+      addLog(`Bridge Completed Successfully!`);
+      toast.success('USDC successfully bridged via Circle CCTP!');
+
+    } catch (error: any) {
+      console.error(error);
+      addLog(`❌ ERROR: ${error.message || error}`);
+      toast.error(`Bridge failed: ${error.message || error}`);
+      setBridgeStep('input');
+    }
   };
 
   const handleSwap = async () => {

@@ -150,6 +150,69 @@ export const CASHFLOW_VAULT_ABI = [
       { name: 'threshold', type: 'uint256', indexed: false },
     ],
   },
+  {
+    type: 'function',
+    name: 'setCoSigner',
+    inputs: [{ name: '_coSigner', type: 'address' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'approveAndExecuteRequest',
+    inputs: [{ name: 'requestId', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'getMultiSigRequestsCount',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'multiSigRequests',
+    inputs: [{ name: 'requestId', type: 'uint256' }],
+    outputs: [
+      { name: 'creator', type: 'address' },
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'category', type: 'string' },
+      { name: 'executed', type: 'bool' },
+      { name: 'ownerApproved', type: 'bool' },
+      { name: 'coSignerApproved', type: 'bool' }
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    name: 'MultiSigRequestCreated',
+    inputs: [
+      { name: 'requestId', type: 'uint256', indexed: true },
+      { name: 'creator', type: 'address', indexed: true },
+      { name: 'to', type: 'address', indexed: true },
+      { name: 'amount', type: 'uint256', indexed: false },
+      { name: 'category', type: 'string', indexed: false }
+    ],
+  },
+  {
+    type: 'event',
+    name: 'MultiSigRequestApproved',
+    inputs: [
+      { name: 'requestId', type: 'uint256', indexed: true },
+      { name: 'approver', type: 'address', indexed: true }
+    ],
+  },
+  {
+    type: 'event',
+    name: 'MultiSigRequestExecuted',
+    inputs: [
+      { name: 'requestId', type: 'uint256', indexed: true },
+      { name: 'executor', type: 'address', indexed: true }
+    ],
+  },
 ] as const;
 
 export const USDC_ABI = [
@@ -195,6 +258,69 @@ export const USDC_ABI = [
     name: 'decimals',
     inputs: [],
     outputs: [{ name: '', type: 'uint8' }],
+    stateMutability: 'view',
+  },
+] as const;
+
+export const PAYROLL_JOB_ADDRESS = '0xdF35E1700Ec6a735160E360eB73Cb5779cCeC66A' as const;
+
+export const PAYROLL_JOB_ABI = [
+  {
+    type: 'function',
+    name: 'createJob',
+    inputs: [
+      { name: 'contractor', type: 'address' },
+      { name: 'paymentAmount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'fundJob',
+    inputs: [{ name: 'jobId', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'releasePayment',
+    inputs: [{ name: 'jobId', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'disputeJob',
+    inputs: [{ name: 'jobId', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'getJobsCount',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getJobs',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple[]',
+        components: [
+          { name: 'id', type: 'uint256' },
+          { name: 'client', type: 'address' },
+          { name: 'contractor', type: 'address' },
+          { name: 'paymentAmount', type: 'uint256' },
+          { name: 'status', type: 'uint8' },
+          { name: 'createdAt', type: 'uint256' },
+        ],
+      },
+    ],
     stateMutability: 'view',
   },
 ] as const;

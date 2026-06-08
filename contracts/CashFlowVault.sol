@@ -60,6 +60,20 @@ contract CashFlowVault {
     // Alert thresholds
     mapping(address => uint256) public lowBalanceThreshold;
 
+    // Multi-Sig / Governance
+    struct MultiSigRequest {
+        address creator;
+        address to;
+        uint256 amount;
+        string category;
+        bool executed;
+        bool ownerApproved;
+        bool coSignerApproved;
+    }
+
+    MultiSigRequest[] public multiSigRequests;
+    address public coSigner;
+
     // Events — critical for on-chain analytics indexing
     event Deposited(address indexed from, uint256 amount, uint256 timestamp);
     event Withdrawn(address indexed to, uint256 amount, uint256 timestamp);
@@ -78,10 +92,16 @@ contract CashFlowVault {
     );
     event AlertThresholdSet(address indexed user, uint256 threshold);
     event LowBalanceAlert(address indexed user, uint256 balance, uint256 threshold);
+    
+    event MultiSigRequestCreated(uint256 indexed requestId, address indexed creator, address indexed to, uint256 amount, string category);
+    event MultiSigRequestApproved(uint256 indexed requestId, address indexed approver);
+    event MultiSigRequestExecuted(uint256 indexed requestId, address indexed executor);
 
     constructor(address _usdc) {
         owner = msg.sender;
         usdc = IERC20(_usdc);
+        // Default coSigner to owner initially
+        coSigner = msg.sender;
     }
 
     /**
@@ -151,23 +171,88 @@ contract CashFlowVault {
         require(amount > 0, "Amount must be positive");
         require(vaultBalances[msg.sender] >= amount, "Insufficient balance");
 
-        vaultBalances[msg.sender] -= amount;
-        require(usdc.transfer(to, amount), "USDC transfer failed");
+        if (amount >= 10000 * 10**6) {
+            // Requires multi-sig approval
+            require(coSigner != address(0), "Co-signer not registered");
+            
+            uint256 requestId = multiSigRequests.length;
+            multiSigRequests.push(MultiSigRequest({
+                creator: msg.sender,
+                to: to,
+                amount: amount,
+                category: category,
+                executed: false,
+                ownerApproved: msg.sender == owner,
+                coSignerApproved: msg.sender == coSigner
+            }));
 
-        uint256 txId = transactions.length;
-        transactions.push(Transaction({
-            from: msg.sender,
-            to: to,
-            amount: amount,
-            category: category,
-            timestamp: block.timestamp,
-            txType: TxType.TRANSFER
-        }));
-        userTransactions[msg.sender].push(txId);
+            // Deduct balance to hold in escrow
+            vaultBalances[msg.sender] -= amount;
 
-        emit Transferred(msg.sender, to, amount, category, block.timestamp);
+            emit MultiSigRequestCreated(requestId, msg.sender, to, amount, category);
+        } else {
+            vaultBalances[msg.sender] -= amount;
+            require(usdc.transfer(to, amount), "USDC transfer failed");
 
-        _checkLowBalance(msg.sender);
+            uint256 txId = transactions.length;
+            transactions.push(Transaction({
+                from: msg.sender,
+                to: to,
+                amount: amount,
+                category: category,
+                timestamp: block.timestamp,
+                txType: TxType.TRANSFER
+            }));
+            userTransactions[msg.sender].push(txId);
+
+            emit Transferred(msg.sender, to, amount, category, block.timestamp);
+            _checkLowBalance(msg.sender);
+        }
+    }
+
+    function setCoSigner(address _coSigner) external onlyOwner {
+        coSigner = _coSigner;
+    }
+
+    function approveAndExecuteRequest(uint256 requestId) external nonReentrant {
+        require(requestId < multiSigRequests.length, "Invalid request ID");
+        MultiSigRequest storage req = multiSigRequests[requestId];
+        require(!req.executed, "Request already executed");
+        require(msg.sender == owner || msg.sender == coSigner, "Not authorized to approve");
+
+        if (msg.sender == owner) {
+            require(!req.ownerApproved, "Already approved by owner");
+            req.ownerApproved = true;
+            emit MultiSigRequestApproved(requestId, owner);
+        } else if (msg.sender == coSigner) {
+            require(!req.coSignerApproved, "Already approved by co-signer");
+            req.coSignerApproved = true;
+            emit MultiSigRequestApproved(requestId, coSigner);
+        }
+
+        if (req.ownerApproved && req.coSignerApproved) {
+            req.executed = true;
+            require(usdc.transfer(req.to, req.amount), "USDC transfer failed");
+
+            uint256 txId = transactions.length;
+            transactions.push(Transaction({
+                from: req.creator,
+                to: req.to,
+                amount: req.amount,
+                category: req.category,
+                timestamp: block.timestamp,
+                txType: TxType.TRANSFER
+            }));
+            userTransactions[req.creator].push(txId);
+
+            emit Transferred(req.creator, req.to, req.amount, req.category, block.timestamp);
+            emit MultiSigRequestExecuted(requestId, msg.sender);
+            _checkLowBalance(req.creator);
+        }
+    }
+
+    function getMultiSigRequestsCount() external view returns (uint256) {
+        return multiSigRequests.length;
     }
 
     /**

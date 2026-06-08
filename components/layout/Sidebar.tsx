@@ -17,6 +17,7 @@ import {
   Code,
   Menu,
   X,
+  Shield,
 } from 'lucide-react';
 
 const navItems = [
@@ -34,6 +35,8 @@ const navItems = [
       { label: 'Cross-Chain Radar', href: '/treasury', icon: Radar },
       { label: 'Send USDC', href: '/send', icon: Send },
       { label: 'Bridge & Swap', href: '/bridge', icon: ArrowUpDown },
+      { label: 'Contractor Payroll', href: '/payroll', icon: FileText },
+      { label: 'Multi-Sig Governance', href: '/governance', icon: Shield },
     ],
   },
   {

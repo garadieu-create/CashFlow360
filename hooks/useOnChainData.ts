@@ -3,7 +3,7 @@
 import { useBalance, useReadContract, usePublicClient, useWatchContractEvent } from 'wagmi';
 import { formatUnits } from 'viem';
 import { USDC_ADDRESS, EURC_ADDRESS, arcTestnet } from '@/lib/arc-config';
-import { USDC_ABI, CASHFLOW_VAULT_ADDRESS, CASHFLOW_VAULT_ABI } from '@/lib/contracts';
+import { USDC_ABI, CASHFLOW_VAULT_ADDRESS, CASHFLOW_VAULT_ABI, PAYROLL_JOB_ADDRESS, PAYROLL_JOB_ABI } from '@/lib/contracts';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -21,13 +21,13 @@ export function useWriteContract() {
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<any>(null);
 
-  const writeContractAsync = useCallback(async ({ address, abi, functionName, args }: any) => {
+  const writeContractAsync = useCallback(async ({ address, abi, functionName, args, chainId }: any) => {
     setIsPending(true);
     setIsSuccess(false);
     setIsError(false);
     setError(null);
     try {
-      const hash = await executeContractWrite(address, abi, functionName, args || []);
+      const hash = await executeContractWrite(address, abi, functionName, args || [], chainId);
       setIsSuccess(true);
       return hash;
     } catch (err) {
@@ -39,8 +39,8 @@ export function useWriteContract() {
     }
   }, [executeContractWrite]);
 
-  const writeContract = useCallback(({ address, abi, functionName, args }: any) => {
-    writeContractAsync({ address, abi, functionName, args }).catch(() => {});
+  const writeContract = useCallback(({ address, abi, functionName, args, chainId }: any) => {
+    writeContractAsync({ address, abi, functionName, args, chainId }).catch(() => {});
   }, [writeContractAsync]);
 
   return {
@@ -317,7 +317,7 @@ export function useLowBalanceWatcher() {
     address: CASHFLOW_VAULT_ADDRESS,
     abi: CASHFLOW_VAULT_ABI,
     eventName: 'LowBalanceAlert',
-    onLogs(logs) {
+    onLogs(logs: any[]) {
       logs.forEach((log) => {
         const { user, balance, threshold } = log.args as any;
         if (address && user && user.toLowerCase() === address.toLowerCase()) {
@@ -393,95 +393,115 @@ export function useLowBalanceWatcher() {
 
 export function useTransactionHistory() {
   const { address } = useAccount();
-  const publicClient = usePublicClient({ chainId: arcTestnet.id });
 
   const query = useQuery({
-    queryKey: ['transactions', address, arcTestnet.id],
+    queryKey: ['transactions', address],
     queryFn: async () => {
-      if (!address || !publicClient) return [];
+      if (!address) return [];
 
-      const blockNumber = await publicClient.getBlockNumber();
-      // Fetch last 5000 blocks to prevent excessive RPC load, or from 0
-      const fromBlock = blockNumber > BigInt(5000) ? blockNumber - BigInt(5000) : BigInt(0);
+      const response = await fetch('/api/indexer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `
+            query {
+              deposits {
+                id
+                from
+                amount
+                timestamp
+                txHash
+              }
+              withdrawals {
+                id
+                to
+                amount
+                timestamp
+                txHash
+              }
+              transfers {
+                id
+                from
+                to
+                amount
+                category
+                timestamp
+                txHash
+              }
+            }
+          `
+        })
+      });
 
-      // Fetch transfer events from USDC contract
-      const [sentLogs, receivedLogs] = await Promise.all([
-        publicClient.getLogs({
-          address: USDC_ADDRESS,
-          event: {
-            type: 'event',
-            name: 'Transfer',
-            inputs: [
-              { name: 'from', type: 'address', indexed: true },
-              { name: 'to', type: 'address', indexed: true },
-              { name: 'value', type: 'uint256', indexed: false },
-            ],
-          },
-          args: { from: address },
-          fromBlock,
-          toBlock: 'latest',
-        }),
-        publicClient.getLogs({
-          address: USDC_ADDRESS,
-          event: {
-            type: 'event',
-            name: 'Transfer',
-            inputs: [
-              { name: 'from', type: 'address', indexed: true },
-              { name: 'to', type: 'address', indexed: true },
-              { name: 'value', type: 'uint256', indexed: false },
-            ],
-          },
-          args: { to: address },
-          fromBlock,
-          toBlock: 'latest',
-        }),
-      ]);
-
-      const allLogs = [
-        ...sentLogs.map(log => ({ log, type: 'outflow' as const })),
-        ...receivedLogs.map(log => ({ log, type: 'inflow' as const }))
-      ];
-
-      // Optimizing block fetching by extracting unique blocks
-      const uniqueBlockNumbers = Array.from(new Set(allLogs.map(x => x.log.blockNumber).filter(Boolean))) as bigint[];
-      const blockTimestampMap = new Map<bigint, number>();
-      
-      // Fetch blocks in parallel chunks
-      const CHUNK_SIZE = 10;
-      for (let i = 0; i < uniqueBlockNumbers.length; i += CHUNK_SIZE) {
-        const chunk = uniqueBlockNumbers.slice(i, i + CHUNK_SIZE);
-        await Promise.all(chunk.map(async (bNum) => {
-          try {
-            const block = await publicClient.getBlock({ blockNumber: bNum });
-            blockTimestampMap.set(bNum, Number(block.timestamp));
-          } catch(e) {
-            console.error('Failed to fetch block', bNum, e);
-          }
-        }));
+      if (!response.ok) {
+        throw new Error('Failed to fetch indexed transactions');
       }
 
-      const txs: Transaction[] = allLogs.map(({ log, type }) => {
-        const bNum = log.blockNumber;
-        const timestamp = (bNum && blockTimestampMap.get(bNum)) || Math.floor(Date.now() / 1000);
-        return {
-          hash: log.transactionHash as string,
-          from: (log.args as any).from as string,
-          to: (log.args as any).to as string,
-          value: formatUnits((log.args as any).value || BigInt(0), USDC_DECIMALS),
-          timestamp,
-          type,
-          category: type === 'inflow' ? 'Transfer In' : 'Transfer Out',
-          blockNumber: bNum || BigInt(0),
-        };
+      const result = await response.json();
+      const data = result.data || {};
+      const deposits = data.deposits || [];
+      const withdrawals = data.withdrawals || [];
+      const transfers = data.transfers || [];
+
+      const txs: Transaction[] = [];
+
+      // Add transfers
+      transfers.forEach((t: any) => {
+        const isFromUser = t.from.toLowerCase() === address.toLowerCase();
+        const isToUser = t.to.toLowerCase() === address.toLowerCase();
+        
+        if (isFromUser || isToUser) {
+          txs.push({
+            hash: t.txHash,
+            from: t.from,
+            to: t.to,
+            value: t.amount,
+            timestamp: t.timestamp,
+            type: isFromUser ? 'outflow' : 'inflow',
+            category: t.category || 'Transfer',
+            blockNumber: BigInt(0)
+          });
+        }
+      });
+
+      // Add deposits
+      deposits.forEach((d: any) => {
+        if (d.from.toLowerCase() === address.toLowerCase()) {
+          txs.push({
+            hash: d.txHash,
+            from: d.from,
+            to: CASHFLOW_VAULT_ADDRESS,
+            value: d.amount,
+            timestamp: d.timestamp,
+            type: 'outflow',
+            category: 'Vault Deposit',
+            blockNumber: BigInt(0)
+          });
+        }
+      });
+
+      // Add withdrawals
+      withdrawals.forEach((w: any) => {
+        if (w.to.toLowerCase() === address.toLowerCase()) {
+          txs.push({
+            hash: w.txHash,
+            from: CASHFLOW_VAULT_ADDRESS,
+            to: w.to,
+            value: w.amount,
+            timestamp: w.timestamp,
+            type: 'inflow',
+            category: 'Vault Withdrawal',
+            blockNumber: BigInt(0)
+          });
+        }
       });
 
       txs.sort((a, b) => b.timestamp - a.timestamp);
       return txs;
     },
-    enabled: !!address && !!publicClient,
-    refetchInterval: 15000,
-    staleTime: 10000,
+    enabled: !!address,
+    refetchInterval: 10000,
+    staleTime: 5000,
   });
 
   return { 
@@ -540,3 +560,170 @@ export function useCashFlowMetrics(transactions: Transaction[]) {
     };
   }, [transactions]);
 }
+
+export function usePayrollJobs() {
+  const { address } = useAccount();
+
+  const { data: jobs, isLoading, refetch } = useReadContract({
+    address: PAYROLL_JOB_ADDRESS,
+    abi: PAYROLL_JOB_ABI,
+    functionName: 'getJobs',
+    chainId: arcTestnet.id,
+    query: {
+      enabled: !!address,
+      refetchInterval: 5000,
+    },
+  });
+
+  return {
+    jobs: (jobs || []) as any[],
+    isLoading,
+    refetch,
+  };
+}
+
+export function usePayrollJobOperations() {
+  const { writeContractAsync } = useWriteContract();
+
+  const createJob = useCallback((contractor: string, paymentAmount: bigint) => {
+    return writeContractAsync({
+      address: PAYROLL_JOB_ADDRESS,
+      abi: PAYROLL_JOB_ABI,
+      functionName: 'createJob',
+      args: [contractor as `0x${string}`, paymentAmount],
+    });
+  }, [writeContractAsync]);
+
+  const fundJob = useCallback((jobId: bigint) => {
+    return writeContractAsync({
+      address: PAYROLL_JOB_ADDRESS,
+      abi: PAYROLL_JOB_ABI,
+      functionName: 'fundJob',
+      args: [jobId],
+    });
+  }, [writeContractAsync]);
+
+  const releasePayment = useCallback((jobId: bigint) => {
+    return writeContractAsync({
+      address: PAYROLL_JOB_ADDRESS,
+      abi: PAYROLL_JOB_ABI,
+      functionName: 'releasePayment',
+      args: [jobId],
+    });
+  }, [writeContractAsync]);
+
+  const disputeJob = useCallback((jobId: bigint) => {
+    return writeContractAsync({
+      address: PAYROLL_JOB_ADDRESS,
+      abi: PAYROLL_JOB_ABI,
+      functionName: 'disputeJob',
+      args: [jobId],
+    });
+  }, [writeContractAsync]);
+
+  return {
+    createJob,
+    fundJob,
+    releasePayment,
+    disputeJob,
+  };
+}
+
+export interface MultiSigRequest {
+  id: number;
+  creator: string;
+  to: string;
+  amount: string;
+  category: string;
+  executed: boolean;
+  ownerApproved: boolean;
+  coSignerApproved: boolean;
+}
+
+export function useMultiSigRequests() {
+  const { address } = useAccount();
+
+  const { data: count, isLoading: countLoading, refetch } = useReadContract({
+    address: CASHFLOW_VAULT_ADDRESS,
+    abi: CASHFLOW_VAULT_ABI,
+    functionName: 'getMultiSigRequestsCount',
+    chainId: arcTestnet.id,
+    query: {
+      refetchInterval: 10000,
+    }
+  });
+
+  const publicClient = usePublicClient({ chainId: arcTestnet.id });
+
+  const query = useQuery({
+    queryKey: ['multiSigRequests', Number(count || 0), address],
+    queryFn: async () => {
+      if (!publicClient || !count) return [];
+      const requestsCount = Number(count);
+      const list: MultiSigRequest[] = [];
+
+      for (let i = 0; i < requestsCount; i++) {
+        try {
+          const reqData = await publicClient.readContract({
+            address: CASHFLOW_VAULT_ADDRESS,
+            abi: CASHFLOW_VAULT_ABI,
+            functionName: 'multiSigRequests',
+            args: [BigInt(i)],
+          }) as any;
+
+          list.push({
+            id: i,
+            creator: reqData[0],
+            to: reqData[1],
+            amount: formatUnits(reqData[2] || BigInt(0), USDC_DECIMALS),
+            category: reqData[3] || 'General',
+            executed: reqData[4],
+            ownerApproved: reqData[5],
+            coSignerApproved: reqData[6],
+          });
+        } catch (e) {
+          console.error('Failed to read request', i, e);
+        }
+      }
+      return list.reverse();
+    },
+    enabled: !!publicClient && count !== undefined,
+  });
+
+  return {
+    requests: query.data || [],
+    isLoading: countLoading || query.isLoading,
+    refetch: () => {
+      refetch();
+      query.refetch();
+    }
+  };
+}
+
+export function useMultiSigOperations() {
+  const { writeContractAsync } = useWriteContract();
+
+  const approveAndExecute = useCallback((requestId: number) => {
+    return writeContractAsync({
+      address: CASHFLOW_VAULT_ADDRESS,
+      abi: CASHFLOW_VAULT_ABI,
+      functionName: 'approveAndExecuteRequest',
+      args: [BigInt(requestId)],
+    });
+  }, [writeContractAsync]);
+
+  const setCoSigner = useCallback((coSignerAddress: string) => {
+    return writeContractAsync({
+      address: CASHFLOW_VAULT_ADDRESS,
+      abi: CASHFLOW_VAULT_ABI,
+      functionName: 'setCoSigner',
+      args: [coSignerAddress as `0x${string}`],
+    });
+  }, [writeContractAsync]);
+
+  return {
+    approveAndExecute,
+    setCoSigner,
+  };
+}
+

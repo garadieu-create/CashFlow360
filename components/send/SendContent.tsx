@@ -4,8 +4,7 @@ import { useState } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits } from 'viem';
 import { USDC_ADDRESS, getExplorerTxUrl } from '@/lib/arc-config';
-import { USDC_ABI } from '@/lib/contracts';
-import { useUSDCBalance } from '@/hooks/useOnChainData';
+import { useUSDCBalance, useVaultOperations, useVaultBalance } from '@/hooks/useOnChainData';
 import { motion } from 'framer-motion';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Send, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react';
@@ -25,12 +24,19 @@ function parseError(error: any): string {
 
 export default function SendContent() {
   const { isConnected, address } = useAccount();
-  const { formatted: balance, refetch } = useUSDCBalance();
+  const { formatted: balance, refetch: refetchUSDC } = useUSDCBalance();
+  const { formatted: vaultBalance, refetch: refetchVault } = useVaultBalance();
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
+  const [category, setCategory] = useState('Operations');
 
-  const { writeContract, data: txHash, isPending, error, reset } = useWriteContract();
+  const { transfer, data: txHash, isPending, error, reset } = useVaultOperations();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+
+  const refetch = () => {
+    refetchUSDC();
+    refetchVault();
+  };
 
   if (!isConnected) {
     return (
@@ -66,13 +72,13 @@ export default function SendContent() {
       return;
     }
 
+    if (parseFloat(amount) > parseFloat(vaultBalance)) {
+      toast.error('Amount exceeds your vault balance');
+      return;
+    }
+
     try {
-      writeContract({
-        address: USDC_ADDRESS,
-        abi: USDC_ABI,
-        functionName: 'transfer',
-        args: [recipient as `0x${string}`, parseUnits(amount, 6)],
-      });
+      transfer(recipient, parseUnits(amount, 6), category);
       toast.loading('Transaction submitted...');
     } catch (err) {
       toast.error('Transaction failed');
@@ -101,9 +107,14 @@ export default function SendContent() {
               <Send size={14} style={{ display: 'inline', marginRight: 6 }} />
               New Transfer
             </span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
-              Balance: ${parseFloat(balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
+                Wallet Balance: ${parseFloat(balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-primary)', fontWeight: 600 }}>
+                Vault Balance: ${parseFloat(vaultBalance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
           </div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xl)' }}>
             {/* Recipient */}
@@ -136,11 +147,41 @@ export default function SendContent() {
                 <button
                   className="btn btn-ghost btn-sm"
                   style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)' }}
-                  onClick={() => setAmount(balance)}
+                  onClick={() => setAmount(vaultBalance)}
                 >
                   MAX
                 </button>
               </div>
+            </div>
+
+            {/* Category Dropdown */}
+            <div className="input-group">
+              <label className="input-label">Transaction Category</label>
+              <select
+                className="input input-mono"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                disabled={isPending || isConfirming}
+                style={{
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 12px center',
+                  backgroundSize: '16px',
+                  paddingRight: '40px',
+                  backgroundColor: 'var(--bg-elevated)',
+                  color: 'var(--text-primary)',
+                  border: '2px solid var(--border-primary)',
+                  borderRadius: 'var(--radius-md)'
+                }}
+              >
+                <option value="Payroll">Payroll</option>
+                <option value="Inventory">Inventory</option>
+                <option value="Operations">Operations</option>
+                <option value="Tax">Tax</option>
+                <option value="Marketing">Marketing</option>
+              </select>
             </div>
 
             {/* Network Fee Preview */}
@@ -152,7 +193,7 @@ export default function SendContent() {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Estimated Balance After</span>
                 <span style={{ fontFamily: 'var(--font-mono)' }}>
-                  ${amount ? Math.max(0, parseFloat(balance) - parseFloat(amount)).toLocaleString('en-US', { minimumFractionDigits: 2 }) : balance}
+                  ${amount ? Math.max(0, parseFloat(vaultBalance) - parseFloat(amount)).toLocaleString('en-US', { minimumFractionDigits: 2 }) : vaultBalance}
                 </span>
               </div>
             </div>

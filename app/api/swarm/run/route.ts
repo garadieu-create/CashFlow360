@@ -160,11 +160,32 @@ export async function POST(req: NextRequest) {
       let bridgeResult = '';
       if (settings.mode === 'live') {
         try {
-          const { execSync } = require('child_process');
-          const cmd = `npx circle bridge transfer ARC-TESTNET ${settings.target_vault_address} --amount ${bridgeAmount} --address ${settings.agent_wallet_address} --chain BASE-SEPOLIA`;
-          const output = execSync(cmd, { 
-            env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
-          }).toString();
+          const evmAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+          if (!evmAddressRegex.test(settings.target_vault_address) || !evmAddressRegex.test(settings.agent_wallet_address)) {
+            throw new Error('Invalid vault or agent wallet address formats in settings database.');
+          }
+          const { execFileSync } = require('child_process');
+          const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+          const output = execFileSync(
+            npxCmd,
+            [
+              'circle',
+              'bridge',
+              'transfer',
+              'ARC-TESTNET',
+              settings.target_vault_address,
+              '--amount',
+              bridgeAmount.toString(),
+              '--address',
+              settings.agent_wallet_address,
+              '--chain',
+              'BASE-SEPOLIA'
+            ],
+            { 
+              encoding: 'utf8',
+              env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+            }
+          );
           bridgeResult = `Success: ${output.trim().replace(/\n/g, ' ').substring(0, 120)}...`;
         } catch (e: any) {
           bridgeResult = `Failed: ${e.message}`;

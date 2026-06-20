@@ -4,7 +4,7 @@ import fs from 'fs';
 import { createPublicClient, http, formatUnits } from 'viem';
 import { arcTestnet, USDC_ADDRESS } from '../lib/arc-config';
 import { CASHFLOW_VAULT_ADDRESS, CASHFLOW_VAULT_ABI } from '../lib/contracts';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 
 // Load environment variables from .env or .env.local
 function loadEnv() {
@@ -147,14 +147,23 @@ function setSetting(key: string, value: string): Promise<void> {
 
 // Interactive login command
 async function handleLogin(email: string) {
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!email || !emailRegex.test(email)) {
+    throw new Error('Invalid email address format.');
+  }
+
   await logToDb(`Initiating email-OTP login for: ${email}`);
   try {
-    const initCmd = `npx circle wallet login ${email} --type agent --init`;
-    logToDb(`Running command: ${initCmd}`, 'SYSTEM');
-    const initOutput = execSync(initCmd, { 
-      encoding: 'utf8',
-      env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
-    });
+    const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+    await logToDb(`Running command: npx circle wallet login ${email} --type agent --init`, 'SYSTEM');
+    const initOutput = execFileSync(
+      npxCmd,
+      ['circle', 'wallet', 'login', email, '--type', 'agent', '--init'],
+      { 
+        encoding: 'utf8',
+        env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+      }
+    );
     console.log(initOutput);
 
     // Parse the request ID from the output (UUID format)
@@ -178,23 +187,36 @@ async function handleLogin(email: string) {
       });
     });
 
-    if (!otp) {
-      throw new Error("OTP code is required to complete authentication.");
+    const otpRegex = /^[a-zA-Z0-9-]{3,12}$/;
+    if (!otp || !otpRegex.test(otp)) {
+      throw new Error("OTP code is required and must be in valid format to complete authentication.");
     }
 
-    const confirmCmd = `npx circle wallet login --type agent --request ${requestId} --otp ${otp}`;
+    const uuidRegex = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+    if (!requestId || !uuidRegex.test(requestId)) {
+      throw new Error("Invalid Request ID format.");
+    }
+
     await logToDb(`Submitting OTP with command: npx circle wallet login --type agent --request ${requestId} --otp <redacted>`, 'SYSTEM');
-    const confirmOutput = execSync(confirmCmd, { 
-      encoding: 'utf8',
-      env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
-    });
+    const confirmOutput = execFileSync(
+      npxCmd,
+      ['circle', 'wallet', 'login', '--type', 'agent', '--request', requestId, '--otp', otp],
+      { 
+        encoding: 'utf8',
+        env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+      }
+    );
     console.log(confirmOutput);
 
     // Verify session
-    const statusOutput = execSync('npx circle wallet status', { 
-      encoding: 'utf8',
-      env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
-    });
+    const statusOutput = execFileSync(
+      npxCmd,
+      ['circle', 'wallet', 'status'],
+      { 
+        encoding: 'utf8',
+        env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+      }
+    );
     await logToDb(`Circle CLI session verified: ${statusOutput.trim()}`, 'SUCCESS');
 
     // Save session status
@@ -339,13 +361,33 @@ async function monitorRunwayAndRebalance() {
         const mode = await getSetting('mode');
 
         if (mode === 'live') {
-          const cmd = `npx circle bridge transfer ARC-TESTNET ${targetVault} --amount ${bridgeAmount} --address ${agentAddress} --chain BASE-SEPOLIA`;
-          await logToDb(`Executing CCTP bridge: ${cmd}`, 'EXEC');
+          const evmAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+          if (!evmAddressRegex.test(targetVault) || !evmAddressRegex.test(agentAddress)) {
+            throw new Error('Invalid vault or agent wallet address formats in settings.');
+          }
+          await logToDb(`Executing CCTP bridge: npx circle bridge transfer ARC-TESTNET ${targetVault} --amount ${bridgeAmount} --address ${agentAddress} --chain BASE-SEPOLIA`, 'EXEC');
           try {
-            execSync(cmd, { 
-              stdio: 'inherit',
-              env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
-            });
+            const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+            execFileSync(
+              npxCmd,
+              [
+                'circle',
+                'bridge',
+                'transfer',
+                'ARC-TESTNET',
+                targetVault,
+                '--amount',
+                bridgeAmount.toString(),
+                '--address',
+                agentAddress,
+                '--chain',
+                'BASE-SEPOLIA'
+              ],
+              { 
+                stdio: 'inherit',
+                env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+              }
+            );
             await logToDb(`Bridge transaction submitted via CCTP successfully.`, 'SUCCESS');
           } catch (e: any) {
             await logToDb(`Bridge command failed: ${e.message}`, 'ERROR');

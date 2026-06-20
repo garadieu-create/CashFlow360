@@ -118,11 +118,16 @@ export async function GET(req: NextRequest) {
     // Check auth status by running npx circle wallet status
     let isAuthenticated = false;
     try {
-      const { execSync } = require('child_process');
-      const statusOutput = execSync('npx circle wallet status', { 
-        encoding: 'utf8',
-        env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
-      });
+      const { execFileSync } = require('child_process');
+      const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+      const statusOutput = execFileSync(
+        npxCmd,
+        ['circle', 'wallet', 'status'],
+        { 
+          encoding: 'utf8',
+          env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+        }
+      );
       if (
         statusOutput.toLowerCase().includes('authenticated') || 
         statusOutput.toLowerCase().includes('agent') || 
@@ -174,31 +179,50 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { runwayThresholdDays, agentWalletAddress, spendingLimitDaily, mode, isAuthenticated } = body;
 
+    // Strict Input Validation
     if (runwayThresholdDays !== undefined) {
+      const parsedDays = Number(runwayThresholdDays);
+      if (isNaN(parsedDays) || parsedDays < 1 || parsedDays > 365) {
+        return NextResponse.json({ success: false, error: 'Invalid runway threshold days. Must be between 1 and 365.' }, { status: 400 });
+      }
       await runDb(
         `INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('runway_threshold_days', ?, ?)`,
-        [runwayThresholdDays.toString(), Date.now()]
+        [parsedDays.toString(), Date.now()]
       );
     }
     if (agentWalletAddress !== undefined) {
+      const evmAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+      if (!evmAddressRegex.test(agentWalletAddress)) {
+        return NextResponse.json({ success: false, error: 'Invalid Ethereum/Arc wallet address format.' }, { status: 400 });
+      }
       await runDb(
         `INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('agent_wallet_address', ?, ?)`,
         [agentWalletAddress, Date.now()]
       );
     }
     if (spendingLimitDaily !== undefined) {
+      const parsedLimit = Number(spendingLimitDaily);
+      if (isNaN(parsedLimit) || parsedLimit < 0) {
+        return NextResponse.json({ success: false, error: 'Invalid daily spending limit. Must be a non-negative number.' }, { status: 400 });
+      }
       await runDb(
         `INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('spending_limit_daily', ?, ?)`,
-        [spendingLimitDaily.toString(), Date.now()]
+        [parsedLimit.toString(), Date.now()]
       );
     }
     if (mode !== undefined) {
+      if (mode !== 'simulation' && mode !== 'live') {
+        return NextResponse.json({ success: false, error: 'Invalid agent mode. Must be "simulation" or "live".' }, { status: 400 });
+      }
       await runDb(
         `INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('mode', ?, ?)`,
         [mode, Date.now()]
       );
     }
     if (isAuthenticated !== undefined) {
+      if (typeof isAuthenticated !== 'boolean') {
+        return NextResponse.json({ success: false, error: 'Invalid authentication status format.' }, { status: 400 });
+      }
       if (isAuthenticated) {
         const mockSessionToken = `session_${Math.random().toString(36).substring(2)}_${Date.now()}`;
         await runDb(

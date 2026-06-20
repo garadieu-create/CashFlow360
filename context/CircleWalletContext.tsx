@@ -65,7 +65,7 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
   // Restore session from localStorage on mount
   useEffect(() => {
     const restoreSession = async () => {
-      const saved = localStorage.getItem('circle_smart_account_session');
+      const saved = sessionStorage.getItem('circle_smart_account_session');
       if (saved) {
         try {
           setIsLoading(true);
@@ -85,7 +85,7 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
           }
         } catch (e) {
           console.error('Failed to restore Circle smart account session:', e);
-          localStorage.removeItem('circle_smart_account_session');
+          sessionStorage.removeItem('circle_smart_account_session');
         } finally {
           setIsLoading(false);
         }
@@ -107,7 +107,7 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
     try {
       // Create passkey transport
       const clientUrl = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL || 'https://api.circle.com/v1/w3s/modular-wallets';
-      const clientKey = process.env.NEXT_PUBLIC_CIRCLE_KIT_KEY || 'sandbox_kit_key_placeholder';
+      const clientKey = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_KEY || process.env.NEXT_PUBLIC_CIRCLE_KIT_KEY || 'sandbox_kit_key_placeholder';
       
       const passkeyTransport = toPasskeyTransport(clientUrl, clientKey);
       
@@ -138,7 +138,7 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
       });
 
       // Save session
-      localStorage.setItem('circle_smart_account_session', JSON.stringify({
+      sessionStorage.setItem('circle_smart_account_session', JSON.stringify({
         ownerPrivateKey: localKey,
         smartAccountAddress: account.address,
         username: user,
@@ -198,7 +198,7 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
       });
 
       // Save session
-      localStorage.setItem('circle_smart_account_session', JSON.stringify({
+      sessionStorage.setItem('circle_smart_account_session', JSON.stringify({
         ownerPrivateKey: localKey,
         smartAccountAddress: account.address,
         email: email,
@@ -219,7 +219,7 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
   };
 
   const logout = () => {
-    localStorage.removeItem('circle_smart_account_session');
+    sessionStorage.removeItem('circle_smart_account_session');
     setSmartAccount(null);
     setAddress(null);
     setIsConnected(false);
@@ -259,7 +259,7 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
     try {
       // 1. Prepare EIP-4337 Modular paymaster transport
       const clientUrl = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL || 'https://api.circle.com/v1/w3s/modular-wallets';
-      const clientKey = process.env.NEXT_PUBLIC_CIRCLE_KIT_KEY || 'sandbox_kit_key_placeholder';
+      const clientKey = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_KEY || process.env.NEXT_PUBLIC_CIRCLE_KIT_KEY || 'sandbox_kit_key_placeholder';
       const modularTransport = toModularTransport(`${clientUrl}/${chainName}`, clientKey);
 
       // Create bundler client
@@ -271,11 +271,17 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
       toast.loading(`Constructing sponsored UserOperation for ${functionName}...`, { id: toastId });
 
       // Build call target
-      const callData = smartAccount.encodeCallData ? smartAccount.encodeCallData({
-        to: contractAddress,
-        value: 0n,
-        data: '0x'
-      }) : '0x';
+      let callData: `0x${string}` = '0x';
+      try {
+        const { encodeFunctionData } = await import('viem');
+        callData = encodeFunctionData({
+          abi,
+          functionName,
+          args
+        });
+      } catch (e) {
+        console.warn('Failed to encode function data:', e);
+      }
 
       // 2. Submit sponsored UserOperation
       let userOpHash: `0x${string}`;
@@ -291,15 +297,28 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
         });
       } catch (err: any) {
         console.warn('Sponsored bundler submission failed, falling back to direct smart account write:', err);
-        // Fallback: If bundler or paymaster endpoints are not configured / fail due to placeholder keys,
-        // we execute the transaction directly on-chain using the public RPC transport, ensuring execution succeeds!
         
-        // Simulating gasless sponsorship on-chain or routing the tx directly
-        const txHash = '0x' + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
-        setIsLastTxSponsored(true);
-        setGasSponsoredCount(prev => prev + 1);
-        toast.success(`Transaction executed with Circle Gasless Sponsorship on ${targetChain.name}!`, { id: toastId });
-        return txHash as `0x${string}`;
+        const saved = sessionStorage.getItem('circle_smart_account_session');
+        const session = saved ? JSON.parse(saved) : null;
+        if (session && session.ownerPrivateKey) {
+          const { createWalletClient } = await import('viem');
+          const ownerAccount = privateKeyToAccount(session.ownerPrivateKey as `0x${string}`);
+          const walletClient = createWalletClient({
+            account: ownerAccount,
+            chain: targetChain,
+            transport: http(targetChain.rpcUrls.default.http[0])
+          });
+          const hash = await walletClient.sendTransaction({
+            to: contractAddress,
+            data: callData,
+            value: 0n,
+          });
+          setIsLastTxSponsored(false);
+          toast.success(`Transaction executed directly on-chain on ${targetChain.name}!`, { id: toastId });
+          return hash;
+        } else {
+          throw new Error('No owner private key found to execute fallback transaction');
+        }
       }
 
       setIsLastTxSponsored(true);

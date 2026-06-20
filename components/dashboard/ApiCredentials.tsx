@@ -90,14 +90,31 @@ export function ApiCredentials() {
         await new Promise(r => setTimeout(r, 1500));
 
         // Step 2: Retry request with signature
-        const mockSignature = Buffer.from(JSON.stringify({
-          signature: "0x_mock_nanopayment_signature_token",
+        const saved = sessionStorage.getItem('circle_smart_account_session');
+        const session = saved ? JSON.parse(saved) : null;
+        let signatureStr = '';
+        let signerAddress = '';
+        if (session && session.ownerPrivateKey) {
+          const { privateKeyToAccount } = await import('viem/accounts');
+          const ownerAccount = privateKeyToAccount(session.ownerPrivateKey as `0x${string}`);
+          signerAddress = ownerAccount.address;
+          signatureStr = await ownerAccount.signMessage({
+            message: data1.requirements[0].invoiceId
+          });
+        } else {
+          signatureStr = '0x_mock_nanopayment_signature_token';
+          signerAddress = '0x0000000000000000000000000000000000000000';
+        }
+
+        const realSignature = Buffer.from(JSON.stringify({
+          signature: signatureStr,
+          signer: signerAddress,
           invoiceId: data1.requirements[0].invoiceId
         })).toString('base64');
 
         setSimLogs(prev => [
           ...prev,
-          `[AI Credit Scorer] Payment token created: ${mockSignature.slice(0, 15)}...`,
+          `[AI Credit Scorer] Payment token created: ${realSignature.slice(0, 15)}...`,
           `[AI Credit Scorer] Re-dispatching request with payment-signature header...`
         ]);
 
@@ -105,7 +122,7 @@ export function ApiCredentials() {
 
         const res2 = await fetch('/api/metrics', {
           headers: {
-            'payment-signature': mockSignature
+            'payment-signature': realSignature
           }
         });
 
@@ -235,7 +252,8 @@ export function ApiCredentials() {
               color: 'var(--text-secondary)',
               border: '1px solid rgba(255, 255, 255, 0.05)',
               overflowX: 'auto',
-              lineHeight: 1.5
+              lineHeight: 1.5,
+              marginBottom: 10
             }}>
               {`// Query protected financial metrics
 const res = await fetch("${endpoint}", {
@@ -248,6 +266,14 @@ const res = await fetch("${endpoint}", {
 });
 const metrics = await res.json();`}
             </div>
+            
+            <a 
+              href="/marketplace" 
+              className="btn btn-secondary btn-sm"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', fontSize: 11 }}
+            >
+              Go to x402 API Marketplace <ArrowRight size={13} />
+            </a>
           </div>
         </div>
       </motion.div>

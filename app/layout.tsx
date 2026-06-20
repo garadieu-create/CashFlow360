@@ -4,9 +4,49 @@ import { Web3Provider } from '@/components/providers/Web3Provider';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
-  title: 'CashFlow360 — SME Cash Flow Intelligence Platform',
-  description: 'Analytics-first cash flow management for SMEs on Arc. Real-time visualization, predictive forecasting, and cross-chain treasury management powered by Circle USDC.',
-  keywords: ['cashflow', 'sme', 'finance', 'usdc', 'arc', 'blockchain', 'analytics'],
+  metadataBase: new URL('https://cashflow360.finance'),
+  title: {
+    default: 'CashFlow360 | AI Cash Flow Intelligence for SMEs',
+    template: '%s | CashFlow360',
+  },
+  description: 'Institutional-grade on-chain cash flow intelligence, real-time analytics, predictive forecasting, and automated payroll for SMEs on Arc. Powered by Circle USDC.',
+  keywords: ['cashflow', 'sme', 'finance', 'usdc', 'arc', 'blockchain', 'analytics', 'treasury', 'escrow', 'passkey'],
+  alternates: {
+    canonical: './',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://cashflow360.finance',
+    siteName: 'CashFlow360',
+    title: 'CashFlow360 | AI Cash Flow Intelligence for SMEs',
+    description: 'Analytics-first cash flow management for SMEs on Arc. Real-time visualization, predictive forecasting, and cross-chain treasury management powered by Circle USDC.',
+    images: [
+      {
+        url: '/logo.png',
+        width: 512,
+        height: 512,
+        alt: 'CashFlow360 Platform Branding Logo',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'CashFlow360 | AI Cash Flow Intelligence for SMEs',
+    description: 'Analytics-first cash flow management for SMEs on Arc. Real-time visualization, predictive forecasting, and cross-chain treasury management powered by Circle USDC.',
+    images: ['/logo.png'],
+  },
   icons: {
     icon: [
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
@@ -49,6 +89,7 @@ export default function RootLayout({
       </head>
       <body>
         <Web3Provider>
+          <a href="#main-content" className="skip-link">Skip to main content</a>
           {children}
           <Toaster
             position="bottom-right"

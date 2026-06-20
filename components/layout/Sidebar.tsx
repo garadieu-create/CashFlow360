@@ -21,6 +21,7 @@ import {
   Cpu,
   ShoppingBag,
 } from 'lucide-react';
+import { useLoading } from '@/components/providers/LoadingProvider';
 
 const navItems = [
   {
@@ -60,10 +61,17 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { startLoading } = useLoading();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const toggleDrawer = () => setIsDrawerOpen(!isDrawerOpen);
   const closeDrawer = () => setIsDrawerOpen(false);
+
+  const handleLinkClick = (href: string) => {
+    if (pathname !== href) {
+      startLoading(`nav-${href}`);
+    }
+  };
 
   return (
     <>
@@ -88,6 +96,7 @@ export default function Sidebar() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    onClick={() => handleLinkClick(item.href)}
                     className={`sidebar-link ${isActive ? 'active' : ''}`}
                   >
                     <Icon />
@@ -118,7 +127,11 @@ export default function Sidebar() {
             <ExternalLink />
             Get Testnet USDC
           </a>
-          <Link href="/docs" className="sidebar-link">
+          <Link 
+            href="/docs" 
+            onClick={() => handleLinkClick('/docs')}
+            className="sidebar-link"
+          >
             <FileText />
             Documentation
           </Link>
@@ -127,19 +140,35 @@ export default function Sidebar() {
 
       {/* 2. MOBILE BOTTOM NAVIGATION BAR (Thumb Zone Optimized) */}
       <div className="mobile-bottom-nav">
-        <Link href="/" className={`mobile-nav-item ${pathname === '/' ? 'active' : ''}`}>
+        <Link 
+          href="/" 
+          onClick={() => handleLinkClick('/')}
+          className={`mobile-nav-item ${pathname === '/' ? 'active' : ''}`}
+        >
           <LayoutDashboard />
           <span>Dash</span>
         </Link>
-        <Link href="/send" className={`mobile-nav-item ${pathname === '/send' ? 'active' : ''}`}>
+        <Link 
+          href="/send" 
+          onClick={() => handleLinkClick('/send')}
+          className={`mobile-nav-item ${pathname === '/send' ? 'active' : ''}`}
+        >
           <Send />
           <span>Send</span>
         </Link>
-        <Link href="/runway" className={`mobile-nav-item ${pathname === '/runway' ? 'active' : ''}`}>
+        <Link 
+          href="/runway" 
+          onClick={() => handleLinkClick('/runway')}
+          className={`mobile-nav-item ${pathname === '/runway' ? 'active' : ''}`}
+        >
           <TrendingUp />
           <span>Runway</span>
         </Link>
-        <Link href="/bridge" className={`mobile-nav-item ${pathname === '/bridge' ? 'active' : ''}`}>
+        <Link 
+          href="/bridge" 
+          onClick={() => handleLinkClick('/bridge')}
+          className={`mobile-nav-item ${pathname === '/bridge' ? 'active' : ''}`}
+        >
           <ArrowUpDown />
           <span>Bridge</span>
         </Link>
@@ -192,7 +221,10 @@ export default function Sidebar() {
                           key={item.href}
                           href={item.href}
                           className={`sidebar-link ${isActive ? 'active' : ''}`}
-                          onClick={closeDrawer}
+                          onClick={() => {
+                            closeDrawer();
+                            handleLinkClick(item.href);
+                          }}
                           style={{ border: isActive ? '1px solid #FFF' : '1px solid transparent' }}
                         >
                           <Icon size={14} />
@@ -232,7 +264,15 @@ export default function Sidebar() {
                 <ExternalLink size={12} />
                 Get Testnet USDC
               </a>
-              <Link href="/docs" className="sidebar-link" style={{ fontSize: 12 }} onClick={closeDrawer}>
+              <Link 
+                href="/docs" 
+                className="sidebar-link" 
+                style={{ fontSize: 12 }} 
+                onClick={() => {
+                  closeDrawer();
+                  handleLinkClick('/docs');
+                }}
+              >
                 <FileText size={12} />
                 Documentation
               </Link>

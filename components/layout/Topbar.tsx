@@ -2,9 +2,12 @@
 
 import { useCircleWallet } from '@/context/CircleWalletContext';
 import { LogOut, Key, Mail, ShieldCheck } from 'lucide-react';
+import Breadcrumb from './Breadcrumb';
+import { useUSDCBalance } from '@/hooks/useOnChainData';
 
 export default function Topbar({ title }: { title: string }) {
   const { address, isConnected, socialEmail, logout, gasSponsoredCount } = useCircleWallet();
+  const { isDemo } = useUSDCBalance();
 
   const truncateAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -13,12 +16,28 @@ export default function Topbar({ title }: { title: string }) {
   return (
     <header className="app-topbar">
       <div className="topbar-left">
-        <span className="topbar-breadcrumb">
-          <span className="topbar-brand-prefix">CashFlow360 / </span>
-          <span className="topbar-active-title">{title}</span>
-        </span>
+        <Breadcrumb />
       </div>
       <div className="topbar-right">
+        {isConnected && isDemo && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 11,
+            fontFamily: 'var(--font-mono)',
+            padding: '4px 10px',
+            background: 'rgba(59, 130, 246, 0.08)',
+            border: '1px solid rgba(59, 130, 246, 0.2)',
+            borderRadius: 6,
+            color: '#3B82F6',
+            fontWeight: 'bold'
+          }}>
+            <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#3B82F6' }} />
+            <span>Demo Mode</span>
+          </div>
+        )}
+
         {isConnected && (
           <div style={{
             display: 'flex',

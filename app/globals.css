@@ -62,10 +62,21 @@
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
 
-  /* Transitions */
+  /* Transitions & Motion System */
   --transition-fast: 80ms ease;
   --transition-base: 150ms ease;
   --transition-slow: 250ms ease;
+
+  /* Motion System Tokens */
+  --motion-duration-ultra-fast: 80ms;
+  --motion-duration-fast: 150ms;
+  --motion-duration-normal: 250ms;
+  --motion-duration-slow: 400ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.1);
+  --motion-ease-entrance: cubic-bezier(0, 0, 0.2, 1);
+  --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
 
   /* Sidebar */
   --sidebar-width: 240px;
@@ -161,10 +172,9 @@ a:hover {
   background: var(--bg-primary);
   border-right: 1px solid var(--border-primary);
   padding: var(--space-xl) var(--space-lg);
-  position: fixed;
+  position: sticky;
   top: 0;
-  left: auto;
-  bottom: 0;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   z-index: 100;
@@ -642,6 +652,18 @@ a:hover {
   gap: var(--space-lg);
 }
 
+.grid-3-1 {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  gap: var(--space-lg);
+}
+
+.marketplace-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1.8fr;
+  gap: var(--space-lg);
+}
+
 /* === Page Headers === */
 .page-header {
   display: flex;
@@ -1025,6 +1047,8 @@ a:hover {
   .grid-2 { grid-template-columns: 1fr; }
   .grid-3 { grid-template-columns: 1fr 1fr; }
   .grid-2-1 { grid-template-columns: 1fr; }
+  .grid-3-1 { grid-template-columns: 1fr; }
+  .marketplace-grid { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
@@ -1077,53 +1101,46 @@ a:hover {
 }
 
 .modal-icon-wrapper {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: 0px !important;
+  border: 2px solid var(--text-primary) !important;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 3px 3px 0px rgba(0, 0, 0, 1) !important;
 }
 
 .modal-icon-wrapper.success {
-  background: var(--ph-green-light);
-  border: 1px solid rgba(119, 185, 108, 0.25);
-  color: var(--ph-green);
-  box-shadow: 0 0 15px rgba(119, 185, 108, 0.15);
+  background: var(--ph-green) !important;
+  color: #000000 !important;
 }
 
-.modal-icon-wrapper.error {
-  background: var(--ph-red-light);
-  border: 1px solid rgba(245, 78, 0, 0.25);
-  color: var(--ph-red);
-  box-shadow: 0 0 15px rgba(245, 78, 0, 0.15);
+.modal-icon-wrapper.error,
+.modal-icon-wrapper.destructive {
+  background: var(--ph-red) !important;
+  color: #FFFFFF !important;
 }
 
 .modal-icon-wrapper.warning {
-  background: rgba(247, 165, 1, 0.08);
-  border: 1px solid rgba(247, 165, 1, 0.25);
-  color: var(--ph-yellow);
-  box-shadow: 0 0 15px rgba(247, 165, 1, 0.1);
+  background: var(--ph-yellow) !important;
+  color: #000000 !important;
 }
 
 .modal-icon-wrapper.confirm {
-  background: rgba(29, 74, 255, 0.08);
-  border: 1px solid rgba(29, 74, 255, 0.25);
-  color: var(--ph-blue);
-  box-shadow: 0 0 15px rgba(29, 74, 255, 0.1);
+  background: var(--ph-blue) !important;
+  color: #FFFFFF !important;
 }
 
 .modal-icon-wrapper.loading {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  color: var(--ph-red);
+  background: var(--bg-secondary) !important;
+  color: var(--ph-red) !important;
 }
 
 .modal-icon-wrapper.transaction {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-primary);
-  color: var(--text-primary);
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
 }
 
 .spinning {
@@ -1282,7 +1299,6 @@ a:hover {
     min-width: 600px; /* Force scroll horizontally instead of squeezing columns */
   }
 
-  /* Adjust hero grids */
   .brutalist-hero {
     grid-template-columns: 1fr !important;
   }
@@ -1296,3 +1312,163 @@ a:hover {
     border-bottom: none !important;
   }
 }
+
+/* Accessibility Skip Navigation Link */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 16px;
+  background: var(--ph-red);
+  color: white !important;
+  padding: 10px 20px;
+  z-index: 9999;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border: 2px solid var(--text-primary);
+  box-shadow: 4px 4px 0px rgba(0,0,0,1);
+  text-decoration: none;
+  transition: top var(--transition-fast);
+}
+
+.skip-link:focus {
+  top: 16px;
+  outline: none;
+}
+
+/* Accessible outline styles */
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--ph-red) !important;
+  outline-offset: 2px;
+}
+
+/* Breadcrumb responsive behavior */
+@media (max-width: 768px) {
+  .breadcrumb-nav {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   Loading, Motion & Feedback System
+   ============================================ */
+
+/* 1. Global Route Transition Progress Bar */
+.global-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--ph-red);
+  z-index: 9999;
+  transform-origin: 0%;
+  box-shadow: 0 1px 3px rgba(245, 78, 0, 0.4);
+}
+
+/* 2. Premium Brutalist Skeleton Loading */
+.brutalist-skeleton {
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-secondary);
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 1px 1px 0px rgba(0, 0, 0, 0.4);
+}
+
+.brutalist-skeleton::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.03) 20%,
+    rgba(255, 255, 255, 0.08) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: brutalist-shimmer 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes brutalist-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* 3. Spinner Animation */
+.premium-spinner {
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-left-color: currentColor;
+  border-radius: 50%;
+  animation: premium-spin 0.6s linear infinite;
+}
+
+@keyframes premium-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 4. Motion Presets (Transform-based animations) */
+.motion-fade-in {
+  animation: fadeIn var(--motion-duration-normal) var(--motion-ease-entrance) forwards;
+}
+
+.motion-fade-up {
+  animation: fadeUp var(--motion-duration-normal) var(--motion-ease-spring) forwards;
+}
+
+.motion-fade-down {
+  animation: fadeDown var(--motion-duration-normal) var(--motion-ease-spring) forwards;
+}
+
+.motion-scale-in {
+  animation: scaleIn var(--motion-duration-normal) var(--motion-ease-spring) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* 5. Reduced Motion Override */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-delay: -1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    background-attachment: scroll !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+  .brutalist-skeleton::after {
+    animation: none !important;
+    background: none !important;
+  }
+  .premium-spinner {
+    animation-duration: 2s !important;
+  }
+}
+
+

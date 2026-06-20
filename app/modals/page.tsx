@@ -3,6 +3,7 @@
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
 import { motion } from 'framer-motion';
+import RelatedContent from '@/components/ui/RelatedContent';
 import { useModal } from '@/context/ModalContext';
 import { 
   HelpCircle, 
@@ -20,7 +21,7 @@ import toast from 'react-hot-toast';
 import { useState } from 'react';
 
 export default function ModalsShowcasePage() {
-  const { openModal, closeModal, updateActiveModal, triggerGlobalError, activeModal } = useModal();
+  const { openModal, closeModal, updateActiveModal, triggerGlobalError, activeModals } = useModal();
   const [simulatedTxStatus, setSimulatedTxStatus] = useState<string>('idle');
 
   // Trigger Confirmation Modal
@@ -251,10 +252,88 @@ export default function ModalsShowcasePage() {
     });
   };
 
+  // Trigger Destructive Action Modal
+  const handleDestructive = () => {
+    openModal({
+      type: 'destructive',
+      title: 'Permanently Decommission Liquidity Vault?',
+      description: 'WARNING: You are about to permanently decommission SME Vault #14. This will withdraw all remaining USDC funds, revoke smart contract delegation, and archive historical ledger summaries. This action CANNOT be undone.',
+      badge: 'Destructive Action',
+      isDismissable: true,
+      buttons: [
+        {
+          label: 'Keep Vault Active',
+          variant: 'secondary',
+          closeModalAfterClick: true
+        },
+        {
+          label: 'Decommission & Withdraw',
+          variant: 'danger',
+          onClick: () => {
+            toast.error('Decommissioned Vault #14 permanently.');
+          },
+          closeModalAfterClick: true
+        }
+      ]
+    });
+  };
+
+  // Trigger Modal with custom react children
+  const handleCustomChildren = () => {
+    openModal({
+      type: 'confirm',
+      title: 'Initiate Escrow Stream',
+      description: 'Provide execution parameters for the smart-contract-controlled USDC escrow distribution channel.',
+      badge: 'Escrow Flow',
+      isDismissable: true,
+      children: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
+          <div className="input-group">
+            <label className="input-label">Recipient Wallet Address</label>
+            <input 
+              type="text" 
+              className="input input-mono" 
+              placeholder="0x71C...3923" 
+              defaultValue="0x9A4B8F3C70D21683E1E5F12C63A642194582E51A"
+            />
+          </div>
+          <div className="input-group">
+            <label className="input-label">USDC Allocation Amount</label>
+            <div style={{ position: 'relative' }}>
+              <input 
+                type="number" 
+                className="input input-mono" 
+                placeholder="0.00" 
+                defaultValue="2500"
+                style={{ paddingRight: 60 }}
+              />
+              <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)' }}>USDC</span>
+            </div>
+          </div>
+        </div>
+      ),
+      buttons: [
+        {
+          label: 'Cancel Stream',
+          variant: 'secondary',
+          closeModalAfterClick: true
+        },
+        {
+          label: 'Deploy Escrow Contract',
+          variant: 'primary',
+          onClick: () => {
+            toast.success('Escrow stream initialized successfully!');
+          },
+          closeModalAfterClick: true
+        }
+      ]
+    });
+  };
+
   return (
     <div className="app-layout">
       <Sidebar />
-      <main className="app-main">
+      <main className="app-main" id="main-content">
         <Topbar title="Modal System Showcase" />
         <div className="app-content">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -275,7 +354,7 @@ export default function ModalsShowcasePage() {
                 <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Settings size={14} /> Live Modal Variant Demonstrator
                 </span>
-                <span className="badge badge-purple">9 Interactive Triggers</span>
+                <span className="badge badge-purple">13 Interactive Triggers</span>
               </div>
               <div className="card-body">
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
@@ -310,6 +389,16 @@ export default function ModalsShowcasePage() {
                     <Layers size={14} /> 6. Blockchain Tx (CCTP)
                   </button>
 
+                  {/* Destructive Action */}
+                  <button className="btn btn-secondary" onClick={handleDestructive} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <AlertOctagon size={14} style={{ color: 'var(--ph-red)' }} /> 7. Destructive Action
+                  </button>
+
+                  {/* Custom Children */}
+                  <button className="btn btn-secondary" onClick={handleCustomChildren} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Code size={14} /> 8. Custom Form Children
+                  </button>
+
                 </div>
 
                 <div style={{ 
@@ -320,7 +409,7 @@ export default function ModalsShowcasePage() {
                   gap: 8 
                 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    7. Unified Global Error Mapping (Wagmi / API Integration)
+                    9. Unified Global Error Mapping (Wagmi / API Integration)
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                     <button className="btn btn-secondary btn-sm" onClick={() => triggerGlobalError('timeout')} style={{ borderColor: 'var(--ph-red)' }}>
@@ -415,6 +504,7 @@ openModal({
             </div>
 
           </motion.div>
+          <RelatedContent />
         </div>
       </main>
     </div>

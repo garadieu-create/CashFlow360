@@ -18,6 +18,8 @@ import {
   Menu,
   X,
   Shield,
+  Cpu,
+  ShoppingBag,
 } from 'lucide-react';
 
 const navItems = [
@@ -27,6 +29,13 @@ const navItems = [
       { label: 'Dashboard', href: '/', icon: LayoutDashboard },
       { label: 'Cash Flow Map', href: '/flow', icon: ArrowLeftRight },
       { label: 'Runway Calculator', href: '/runway', icon: TrendingUp },
+    ],
+  },
+  {
+    section: 'Lepton Agents',
+    items: [
+      { label: 'AI Swarm Terminal', href: '/swarm', icon: Cpu },
+      { label: 'x402 Marketplace', href: '/marketplace', icon: ShoppingBag },
     ],
   },
   {

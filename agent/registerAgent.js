@@ -28,7 +28,7 @@ async function registerAgent() {
   
   // 1. Read agent wallet address
   const settingsRows = await queryDb(`SELECT value FROM settings WHERE key = 'agent_wallet_address'`);
-  const agentAddress = settingsRows[0]?.value || '0x2724D3E646A9409b85c1B85DbeB9Fd6FA46C396a';
+  const agentAddress = settingsRows[0]?.value || '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b';
   
   console.log(`Target Agent Address: ${agentAddress}`);
   console.log(`Agent Metadata:`);
@@ -36,14 +36,60 @@ async function registerAgent() {
   console.log(`  - Type: "Treasury Manager"`);
   console.log(`  - Standard: "ERC-8004 Trustless Agent Identity"`);
   
-  // 2. Simulate or execute registry transaction on Arc Testnet
-  const txHash = `0x${Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('')}`;
+  // 2. Execute registry transaction on Arc Testnet
+  const deployerKey = '0x920df0748032d4d324be4e2171414365661733c008a67d05edc43001aa67ff13';
   const reputationScore = 98; // ERC-8004 reputation score (out of 100)
   
   console.log(`Connecting to Arc Testnet RPC: https://rpc.testnet.arc.network...`);
-  console.log(`Signing identity registration via Agent Wallet...`);
-  console.log(`Submitting ERC-8004 registration transaction...`);
-  console.log(`Transaction successful! Hash: ${txHash}`);
+  console.log(`Signing identity registration via Deployer Wallet...`);
+  
+  let txHash = '';
+  try {
+    const { createWalletClient, http, stringToHex, getAddress } = await import('viem');
+    const { privateKeyToAccount } = await import('viem/accounts');
+    const { defineChain } = await import('viem');
+    
+    const arcTestnet = defineChain({
+      id: 5042002,
+      name: 'Arc Testnet',
+      nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+      rpcUrls: {
+        default: { http: ['https://rpc.testnet.arc.network'] },
+      },
+      blockExplorers: {
+        default: { name: 'Arcscan', url: 'https://testnet.arcscan.app' },
+      },
+      testnet: true,
+    });
+    
+    const formattedAgentAddress = getAddress(agentAddress);
+    const deployerAccount = privateKeyToAccount(deployerKey);
+    const walletClient = createWalletClient({
+      account: deployerAccount,
+      chain: arcTestnet,
+      transport: http('https://rpc.testnet.arc.network')
+    });
+    
+    const registrationMetadata = JSON.stringify({
+      standard: "ERC-8004",
+      agentName: "CashFlow360 Agent",
+      agentAddress: formattedAgentAddress,
+      agentType: "Treasury Manager",
+      reputationScore: reputationScore
+    });
+    
+    console.log(`Submitting ERC-8004 registration transaction to Arc Testnet...`);
+    txHash = await walletClient.sendTransaction({
+      to: formattedAgentAddress,
+      data: stringToHex(registrationMetadata),
+      value: 0n
+    });
+    
+    console.log(`Transaction successful! Hash: ${txHash}`);
+  } catch (err) {
+    console.error(`On-chain transaction submission failed: ${err.message}`);
+    throw err;
+  }
   
   // 3. Save registration status to database
   await runDb(`INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('agent_registered_on_chain', 'true', ?)`, [Date.now()]);

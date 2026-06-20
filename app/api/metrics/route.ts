@@ -79,20 +79,20 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // 2. Validate Payment (Simulation verification matching Circle Gateway SDK validation)
-    // We assume the payment signature is a valid authorization. In production, we verify the signature against the gateway.
+    // 2. Validate Payment (Strict EIP-191 cryptographic verification using viem)
     let verified = false;
     try {
-      // Decode PAYMENT-SIGNATURE or verify token
       const sigData = JSON.parse(Buffer.from(signature, 'base64').toString('utf-8'));
-      if (sigData || signature.length > 10) {
-        verified = true;
+      if (sigData && sigData.signature && sigData.signer && sigData.invoiceId) {
+        const { verifyMessage } = await import('viem');
+        verified = await verifyMessage({
+          address: sigData.signer as `0x${string}`,
+          message: sigData.invoiceId,
+          signature: sigData.signature as `0x${string}`
+        });
       }
-    } catch {
-      // Fallback: If not base64, check if it is a simulated credential header
-      if (signature.startsWith('0x') || signature === 'mock-agent-signature-token') {
-        verified = true;
-      }
+    } catch (err: any) {
+      console.error("[Verification Error]:", err.message);
     }
 
     if (!verified) {
@@ -127,13 +127,21 @@ export async function GET(req: NextRequest) {
       transport: http('https://rpc.testnet.arc.network')
     });
 
+    const { searchParams } = new URL(req.url);
+    let ownerAddress = searchParams.get('owner');
+
+    if (!ownerAddress) {
+      const dbOwner = await queryDb(`SELECT value FROM settings WHERE key = 'agent_wallet_address'`);
+      ownerAddress = dbOwner[0]?.value || '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b';
+    }
+
     let vaultUSDC = BigInt(0);
     try {
       vaultUSDC = await client.readContract({
         address: CASHFLOW_VAULT_ADDRESS as `0x${string}`,
         abi: CASHFLOW_VAULT_ABI,
         functionName: 'getVaultBalance',
-        args: ['0x2724D3E646A9409b85c1B85DbeB9Fd6FA46C396a']
+        args: [ownerAddress as `0x${string}`]
       }) as bigint;
     } catch {
       vaultUSDC = await client.readContract({

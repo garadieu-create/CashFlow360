@@ -39,10 +39,10 @@ interface LogEntry {
 export function AgentSettings() {
   const [settings, setSettings] = useState<AgentSettingsData>({
     runwayThresholdDays: 30,
-    agentWalletAddress: '0x2724D3E646A9409b85c1B85DbeB9Fd6FA46C396a',
+    agentWalletAddress: '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b',
     spendingLimitDaily: 5000,
     targetVaultAddress: '',
-    mode: 'simulation',
+    mode: 'live',
     isAuthenticated: false,
     registeredOnChain: false,
     reputationScore: 0,
@@ -53,11 +53,12 @@ export function AgentSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
-  // OTP simulation states
+  // OTP verification states
   const [email, setEmail] = useState('');
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [authenticating, setAuthenticating] = useState(false);
+  const [requestId, setRequestId] = useState('');
 
   const fetchAgentData = async () => {
     try {
@@ -113,12 +114,21 @@ export function AgentSettings() {
     setAuthenticating(true);
     const toastId = toast.loading('Requesting Circle Agent Stack OTP...');
     try {
-      // Mock call matching backend API triggers
-      await new Promise(r => setTimeout(r, 1500));
-      setShowOtp(true);
-      toast.success('Verification code dispatched to email!', { id: toastId });
-    } catch {
-      toast.error('Error dispatching verification code', { id: toastId });
+      const res = await fetch('/api/agent/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'init', email })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRequestId(data.requestId);
+        setShowOtp(true);
+        toast.success('Verification code dispatched to email!', { id: toastId });
+      } else {
+        toast.error(data.error || 'Error dispatching verification code', { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(`Connection error: ${err.message}`, { id: toastId });
     } finally {
       setAuthenticating(false);
     }
@@ -132,37 +142,44 @@ export function AgentSettings() {
     setAuthenticating(true);
     const toastId = toast.loading('Establishing secure Agent Session...');
     try {
-      // Save session in agent database
-      const res = await fetch('/api/agent', {
+      const res = await fetch('/api/agent/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          // Mock login flow updates authenticated status
-          isAuthenticated: true
-        })
+        body: JSON.stringify({ action: 'verify', requestId, otp: otpCode })
       });
-
-      // Directly update API auth mock using custom simulation triggers
-      await new Promise(r => setTimeout(r, 1000));
-      toast.success('Agent Stack authenticated successfully!', { id: toastId });
-      setShowOtp(false);
-      setSettings(prev => ({ ...prev, isAuthenticated: true }));
-      fetchAgentData();
-    } catch {
-      toast.error('Failed to establish session', { id: toastId });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success('Agent Stack authenticated successfully!', { id: toastId });
+        setShowOtp(false);
+        setSettings(prev => ({ ...prev, isAuthenticated: true }));
+        fetchAgentData();
+      } else {
+        toast.error(data.error || 'Failed to establish session', { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(`Connection error: ${err.message}`, { id: toastId });
     } finally {
       setAuthenticating(false);
     }
   };
 
-  const triggerMockReplenish = async () => {
+  const triggerLiveReplenish = async () => {
     const toastId = toast.loading('Manually triggering agent runway analysis...');
     try {
-      await new Promise(r => setTimeout(r, 1500));
-      toast.success('Agent replenishment cycle executed successfully!', { id: toastId });
-      fetchAgentData();
-    } catch {
-      toast.error('Agent execution error', { id: toastId });
+      const res = await fetch('/api/swarm/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ triggerRebalance: true })
+      });
+      if (res.ok) {
+        toast.success('Agent replenishment cycle executed successfully!', { id: toastId });
+        fetchAgentData();
+      } else {
+        const data = await res.json();
+        toast.error(`Execution error: ${data.error || 'Unknown error'}`, { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(`Connection error: ${err.message}`, { id: toastId });
     }
   };
 
@@ -321,7 +338,7 @@ export function AgentSettings() {
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={triggerMockReplenish}
+                onClick={triggerLiveReplenish}
                 style={{ padding: '10px 14px' }}
               >
                 <Zap size={14} fill="currentColor" />

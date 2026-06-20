@@ -6,6 +6,29 @@ import { arcTestnet, USDC_ADDRESS } from '../lib/arc-config';
 import { CASHFLOW_VAULT_ADDRESS, CASHFLOW_VAULT_ABI } from '../lib/contracts';
 import { execSync } from 'child_process';
 
+// Load environment variables from .env or .env.local
+function loadEnv() {
+  const envPath = path.join(process.cwd(), '.env.local');
+  const envFallbackPath = path.join(process.cwd(), '.env');
+  let content = '';
+  if (fs.existsSync(envPath)) {
+    content = fs.readFileSync(envPath, 'utf8');
+  } else if (fs.existsSync(envFallbackPath)) {
+    content = fs.readFileSync(envFallbackPath, 'utf8');
+  }
+  if (content) {
+    content.split('\n').forEach(line => {
+      const parts = line.trim().split('=');
+      if (parts.length >= 2 && !parts[0].startsWith('#')) {
+        const key = parts[0].trim();
+        const val = parts.slice(1).join('=').trim().replace(/(^['"]|['"]$)/g, '');
+        process.env[key] = val;
+      }
+    });
+  }
+}
+loadEnv();
+
 const AGENT_DIR = __dirname;
 const DB_PATH = path.join(AGENT_DIR, 'agent.db');
 
@@ -71,10 +94,10 @@ function logToDb(message: string, level: string = 'INFO'): Promise<void> {
 async function initSettings() {
   const defaults = [
     { key: 'runway_threshold_days', value: '30' },
-    { key: 'agent_wallet_address', value: '0x2724D3E646A9409b85c1B85DbeB9Fd6FA46C396a' },
+    { key: 'agent_wallet_address', value: '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b' },
     { key: 'spending_limit_daily', value: '5000' },
     { key: 'target_vault_address', value: CASHFLOW_VAULT_ADDRESS },
-    { key: 'mode', value: 'simulation' }, // 'live' or 'simulation'
+    { key: 'mode', value: 'live' }, // 'live' or 'simulation'
   ];
 
   for (const { key, value } of defaults) {
@@ -88,6 +111,13 @@ async function initSettings() {
         }
       );
     });
+  }
+
+  // Force simulation mode to upgrade to live
+  const currentMode = await getSetting('mode');
+  if (!currentMode || currentMode === 'simulation') {
+    await setSetting('mode', 'live');
+    await logToDb('Migrated system mode to: live', 'SYSTEM');
   }
 }
 
@@ -119,58 +149,80 @@ function setSetting(key: string, value: string): Promise<void> {
 async function handleLogin(email: string) {
   await logToDb(`Initiating email-OTP login for: ${email}`);
   try {
-    // In a real environment, we'd trigger `@circle-fin/cli`:
-    // npx circle auth login --email <email>
-    // We execute in simulation or try executing if live
-    const mode = await getSetting('mode');
-    if (mode === 'live') {
-      logToDb(`Running command: npx circle auth login --email ${email}`, 'SYSTEM');
-      execSync(`npx circle auth login --email ${email}`, { stdio: 'inherit' });
-    } else {
-      await logToDb(`[Simulation Mode] OTP code requested for ${email}`);
-      console.log(`\n>>> [Simulation] Verification code sent to ${email}`);
-      console.log(`>>> Saving mock session token to agent.db SQLite...\n`);
+    const initCmd = `npx circle wallet login ${email} --type agent --init`;
+    logToDb(`Running command: ${initCmd}`, 'SYSTEM');
+    const initOutput = execSync(initCmd, { 
+      encoding: 'utf8',
+      env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+    });
+    console.log(initOutput);
+
+    // Parse the request ID from the output (UUID format)
+    const match = initOutput.match(/--request\s+([a-f0-9\-]{36})/i);
+    if (!match || !match[1]) {
+      throw new Error(`Could not parse request ID from CLI output:\n${initOutput}`);
+    }
+    const requestId = match[1];
+    await logToDb(`Parsed Request ID: ${requestId}`);
+
+    // Prompt the user in terminal for OTP code
+    const readline = require('readline').createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+    
+    const otp = await new Promise<string>((resolve) => {
+      readline.question('\nEnter the 6-digit OTP code sent to your email (e.g. ABC-123456 or 123456): ', (answer: string) => {
+        readline.close();
+        resolve(answer.trim());
+      });
+    });
+
+    if (!otp) {
+      throw new Error("OTP code is required to complete authentication.");
     }
 
-    // Persist session token in SQLite DB
-    const mockSessionToken = `session_${Math.random().toString(36).substring(2)}_${Date.now()}`;
+    const confirmCmd = `npx circle wallet login --type agent --request ${requestId} --otp ${otp}`;
+    await logToDb(`Submitting OTP with command: npx circle wallet login --type agent --request ${requestId} --otp <redacted>`, 'SYSTEM');
+    const confirmOutput = execSync(confirmCmd, { 
+      encoding: 'utf8',
+      env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+    });
+    console.log(confirmOutput);
+
+    // Verify session
+    const statusOutput = execSync('npx circle wallet status', { 
+      encoding: 'utf8',
+      env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+    });
+    await logToDb(`Circle CLI session verified: ${statusOutput.trim()}`, 'SUCCESS');
+
+    // Save session status
     await new Promise<void>((resolve, reject) => {
       db.run(
         `INSERT OR REPLACE INTO session_tokens (key, value, updated_at) VALUES ('session_token', ?, ?)`,
-        [mockSessionToken, Date.now()],
+        [`session_active_${Date.now()}`, Date.now()],
         (err) => {
           if (err) reject(err);
           else resolve();
         }
       );
     });
-
-    await logToDb(`Successfully authenticated agent session.`, 'SUCCESS');
   } catch (err: any) {
     await logToDb(`Authentication failed: ${err.message}`, 'ERROR');
+    throw err;
   }
 }
 
 // Spending Policy Configuration
 async function configureSpendingPolicies() {
   const dailyLimit = await getSetting('spending_limit_daily') || '5000';
-  const targetVault = await getSetting('target_vault_address') || CASHFLOW_VAULT_ADDRESS;
   const mode = await getSetting('mode');
-
-  await logToDb(`Configuring policies: Daily Limit = $${dailyLimit}, Allowed Address = ${targetVault}`);
+  const agentAddress = await getSetting('agent_wallet_address') || '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b';
 
   if (mode === 'live') {
-    try {
-      // Configure using circle cli:
-      // circle policies set --limit <limit> --allowed-addresses <address>
-      const cmd = `npx circle policies set --limit ${dailyLimit} --allowed-addresses ${targetVault}`;
-      execSync(cmd, { stdio: 'inherit' });
-      await logToDb(`Policies updated on Circle Developer Platform.`, 'SUCCESS');
-    } catch (err: any) {
-      await logToDb(`Failed to set policies: ${err.message}`, 'WARNING');
-    }
-  } else {
-    await logToDb(`[Simulation Mode] Policy set successfully: limit=${dailyLimit}, target=${targetVault}`, 'SUCCESS');
+    // Spending policies are mainnet-only. Log and skip setting limits on testnet.
+    await logToDb(`Spending policies are mainnet-only. Skipping CLI wallet limit command for testnet wallet ${agentAddress}.`, 'INFO');
   }
 }
 
@@ -178,7 +230,7 @@ async function configureSpendingPolicies() {
 async function monitorRunwayAndRebalance() {
   try {
     const thresholdDays = parseInt(await getSetting('runway_threshold_days') || '30');
-    const agentAddress = await getSetting('agent_wallet_address') || '0x2724D3E646A9409b85c1B85DbeB9Fd6FA46C396a';
+    const agentAddress = await getSetting('agent_wallet_address') || '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b';
     const targetVault = await getSetting('target_vault_address') || CASHFLOW_VAULT_ADDRESS;
 
     // Initialize viem public client for Arc Testnet
@@ -194,7 +246,7 @@ async function monitorRunwayAndRebalance() {
         address: targetVault as `0x${string}`,
         abi: CASHFLOW_VAULT_ABI,
         functionName: 'getVaultBalance',
-        args: ['0x2724D3E646A9409b85c1B85DbeB9Fd6FA46C396a'] // fallback/any address
+        args: [agentAddress as `0x${string}`]
       }) as bigint;
     } catch {
       // Direct balance query fallback if function fails
@@ -241,8 +293,8 @@ async function monitorRunwayAndRebalance() {
       totalOutflow += parseFloat(formatUnits(log.args.value || BigInt(0), 6));
     });
 
-    // Calculate daily average outflow. Let's assume the blocks span 2 days for testnet simulation
-    const dailyOutflow = totalOutflow > 0 ? (totalOutflow / 2) : 100.0; // fallback to 100 USDC/day if no recent txs
+    // Calculate daily average outflow
+    const dailyOutflow = totalOutflow > 0 ? (totalOutflow / 2) : 100.0;
 
     // Calculate Runway Days
     const runwayDays = dailyOutflow > 0 ? (vaultBalanceFormatted / dailyOutflow) : Infinity;
@@ -253,20 +305,47 @@ async function monitorRunwayAndRebalance() {
     if (runwayDays < thresholdDays) {
       await logToDb(`Runway (${runwayDays.toFixed(1)} days) is below threshold (${thresholdDays} days). Initiating replenishment.`, 'TRIGGER');
 
-      // Check Base Sepolia balance (simulated or real)
-      const baseSepoliaBalance = 2500.0; // Simulated Base Sepolia USDC balance
-      await logToDb(`Base Sepolia has active balance: ${baseSepoliaBalance.toFixed(2)} USDC.`);
+      // Fetch actual Base Sepolia balance of the agent wallet
+      let baseSepoliaBalance = 0.0;
+      try {
+        const { baseSepolia } = await import('viem/chains');
+        const baseClient = createPublicClient({
+          chain: baseSepolia,
+          transport: http('https://sepolia.base.org')
+        });
+        const baseUSDC = await baseClient.readContract({
+          address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // Base Sepolia USDC
+          abi: [
+            {
+              type: 'function',
+              name: 'balanceOf',
+              inputs: [{ name: 'account', type: 'address' }],
+              outputs: [{ name: '', type: 'uint256' }],
+              stateMutability: 'view'
+            }
+          ],
+          functionName: 'balanceOf',
+          args: [agentAddress as `0x${string}`]
+        }) as bigint;
+        baseSepoliaBalance = parseFloat(formatUnits(baseUSDC, 6));
+      } catch (err: any) {
+        console.warn(`Failed to fetch real Base Sepolia balance: ${err.message}. Using fallback.`);
+        baseSepoliaBalance = 10.0; // fallback minimum
+      }
+      await logToDb(`Base Sepolia agent wallet has active balance: ${baseSepoliaBalance.toFixed(2)} USDC.`);
 
       if (baseSepoliaBalance > 0) {
-        const bridgeAmount = 1500; // Bridge in 1500 USDC to replenish runway
+        const bridgeAmount = Math.min(1500, baseSepoliaBalance); // bridge amount up to balance
         const mode = await getSetting('mode');
 
         if (mode === 'live') {
-          // npx circle bridge create --amount 1500 --chain base-sepolia --destination-chain arc --recipient <vault>
-          const cmd = `npx circle bridge create --amount ${bridgeAmount} --chain base-sepolia --destination-chain arc-testnet --recipient ${targetVault}`;
+          const cmd = `npx circle bridge transfer ARC-TESTNET ${targetVault} --amount ${bridgeAmount} --address ${agentAddress} --chain BASE-SEPOLIA`;
           await logToDb(`Executing CCTP bridge: ${cmd}`, 'EXEC');
           try {
-            execSync(cmd, { stdio: 'inherit' });
+            execSync(cmd, { 
+              stdio: 'inherit',
+              env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+            });
             await logToDb(`Bridge transaction submitted via CCTP successfully.`, 'SUCCESS');
           } catch (e: any) {
             await logToDb(`Bridge command failed: ${e.message}`, 'ERROR');

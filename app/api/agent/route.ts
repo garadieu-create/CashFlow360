@@ -43,10 +43,10 @@ function ensureDatabaseInitialized(): Promise<void> {
       // Default settings
       const defaults = [
         { key: 'runway_threshold_days', value: '30' },
-        { key: 'agent_wallet_address', value: '0x2724D3E646A9409b85c1B85DbeB9Fd6FA46C396a' },
+        { key: 'agent_wallet_address', value: '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b' },
         { key: 'spending_limit_daily', value: '5000' },
-        { key: 'target_vault_address', value: '0x8704caa872Ac721e648DBeB9Fd6FA46C396a' },
-        { key: 'mode', value: 'simulation' }
+        { key: 'target_vault_address', value: '0x8704caa872Ac721e648DBeB9Fd6FA46C396d6Aad' },
+        { key: 'mode', value: 'live' }
       ];
 
       defaults.forEach(({ key, value }) => {
@@ -60,7 +60,7 @@ function ensureDatabaseInitialized(): Promise<void> {
       db.get(`SELECT COUNT(*) as count FROM logs`, (err, row: any) => {
         if (!err && row && row.count === 0) {
           const initialLogs = [
-            { timestamp: Date.now() - 30000, message: 'Autonomous Treasury Agent initialized in simulation mode.', level: 'SYSTEM' },
+            { timestamp: Date.now() - 30000, message: 'Autonomous Treasury Agent initialized in live mode.', level: 'SYSTEM' },
             { timestamp: Date.now() - 25000, message: 'Policies configured: $5,000 daily limit, allowed destination CashFlowVault.', level: 'SUCCESS' },
             { timestamp: Date.now() - 10000, message: 'Active runway monitoring loop running. Current vault health check: OK.', level: 'INFO' }
           ];
@@ -115,9 +115,33 @@ export async function GET(req: NextRequest) {
       settingsMap[row.key] = row.value;
     });
 
-    // Check auth status
-    const sessionRows = await queryDb(`SELECT value FROM session_tokens WHERE key = 'session_token'`);
-    const isAuthenticated = sessionRows.length > 0;
+    // Check auth status by running npx circle wallet status
+    let isAuthenticated = false;
+    try {
+      const { execSync } = require('child_process');
+      const statusOutput = execSync('npx circle wallet status', { 
+        encoding: 'utf8',
+        env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+      });
+      if (
+        statusOutput.toLowerCase().includes('authenticated') || 
+        statusOutput.toLowerCase().includes('agent') || 
+        statusOutput.toLowerCase().includes('wallet')
+      ) {
+        isAuthenticated = true;
+        
+        // Try to parse the real agent wallet address from output
+        const addressMatch = statusOutput.match(/(0x[a-fA-F0-9]{40})/);
+        if (addressMatch && addressMatch[1]) {
+          const liveAddress = addressMatch[1];
+          await runDb(`INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('agent_wallet_address', ?, ?)`, [liveAddress, Date.now()]);
+          settingsMap.agent_wallet_address = liveAddress;
+        }
+      }
+    } catch (e: any) {
+      const sessionRows = await queryDb(`SELECT value FROM session_tokens WHERE key = 'session_token'`);
+      isAuthenticated = sessionRows.length > 0;
+    }
 
     // Fetch latest logs
     const logs = await queryDb(`SELECT timestamp, message, level FROM logs ORDER BY id DESC LIMIT 15`);
@@ -126,7 +150,7 @@ export async function GET(req: NextRequest) {
       success: true,
       settings: {
         runwayThresholdDays: parseInt(settingsMap.runway_threshold_days || '30'),
-        agentWalletAddress: settingsMap.agent_wallet_address || '0x2724D3E646A9409b85c1B85DbeB9Fd6FA46C396a',
+        agentWalletAddress: settingsMap.agent_wallet_address || '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b',
         spendingLimitDaily: parseFloat(settingsMap.spending_limit_daily || '5000'),
         targetVaultAddress: settingsMap.target_vault_address || '',
         mode: settingsMap.mode || 'simulation',

@@ -2,7 +2,7 @@
 
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, 
@@ -48,6 +48,22 @@ export default function PayrollPage() {
 
   // Operation Pending State per job
   const [pendingJobId, setPendingJobId] = useState<number | null>(null);
+
+  // Continuous Streaming State
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamRate, setStreamRate] = useState(0.0001); // USDC per second
+  const [streamAccumulated, setStreamAccumulated] = useState(0);
+  const [streamContractor, setStreamContractor] = useState('0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b');
+
+  useEffect(() => {
+    let interval: any;
+    if (isStreaming) {
+      interval = setInterval(() => {
+        setStreamAccumulated(prev => prev + (streamRate / 10));
+      }, 100);
+    }
+    return () => clearInterval(interval);
+  }, [isStreaming, streamRate]);
 
   // Read allowance for Payroll Job contract
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
@@ -377,6 +393,110 @@ export default function PayrollPage() {
                   <div style={{ fontSize: 12 }}>Create a job to establish an escrow payroll.</div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Continuous Wage Streaming Card */}
+          <div className="card" style={{ marginTop: '24px', border: '2px solid var(--text-primary)', boxShadow: '8px 8px 0px rgba(0,0,0,0.9)' }}>
+            <div className="card-header" style={{ borderBottom: '2px solid var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Clock size={18} style={{ color: 'var(--ph-green)' }} />
+                <span className="card-title">Continuous Wage Streaming Portal</span>
+              </div>
+              <span className={`badge ${isStreaming ? 'badge-green' : 'badge-secondary'}`}>
+                {isStreaming ? 'STREAM ACTIVE' : 'STREAM IDLE'}
+              </span>
+            </div>
+            <div className="card-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', padding: '20px' }}>
+              
+              {/* Left Column: Ticker & Visual stream */}
+              <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 8, padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '220px' }}>
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                  Accumulated Streamed Payroll
+                </span>
+                <div style={{ fontSize: 32, fontWeight: 900, fontFamily: 'var(--font-mono)', color: 'var(--ph-green)', marginBottom: 16 }}>
+                  ${streamAccumulated.toFixed(6)} <span style={{ fontSize: 16 }}>USDC</span>
+                </div>
+                
+                {/* Visual arrow flow animation */}
+                <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', background: 'var(--bg-primary)', borderRadius: 6, fontSize: 11, fontFamily: 'var(--font-mono)' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Corporate Vault</span>
+                  <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', margin: '0 12px' }}>
+                    <div style={{ width: '100%', height: '2px', background: isStreaming ? 'var(--ph-green)' : 'var(--border-primary)' }} />
+                    {isStreaming && (
+                      <motion.div 
+                        animate={{ x: [-30, 30] }}
+                        transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                        style={{ position: 'absolute', width: 6, height: 6, borderRadius: '50%', background: 'var(--ph-green)' }}
+                      />
+                    )}
+                  </div>
+                  <span style={{ color: 'var(--ph-blue)' }}>
+                    {streamContractor.slice(0, 6)}...{streamContractor.slice(-4)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Right Column: Controls */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
+                    Recipient Contractor Wallet
+                  </label>
+                  <input 
+                    type="text" 
+                    className="form-control"
+                    value={streamContractor}
+                    onChange={(e) => setStreamContractor(e.target.value)}
+                    placeholder="0x..."
+                    style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
+                    <span>Streaming rate</span>
+                    <span style={{ color: 'var(--ph-green)', fontFamily: 'var(--font-mono)' }}>{(streamRate * 60).toFixed(4)} USDC/min</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="0.00001" 
+                    max="0.001" 
+                    step="0.00001"
+                    value={streamRate}
+                    onChange={(e) => setStreamRate(parseFloat(e.target.value))}
+                    style={{ cursor: 'pointer', accentColor: 'var(--ph-green)' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
+                  <button 
+                    className={`btn ${isStreaming ? 'btn-secondary' : 'btn-primary'}`} 
+                    style={{ flex: 1, padding: 12 }}
+                    onClick={() => {
+                      setIsStreaming(!isStreaming);
+                      if (!isStreaming) {
+                        toast.success('Continuous wage stream initiated!');
+                      } else {
+                        toast('Wage stream paused.');
+                      }
+                    }}
+                  >
+                    {isStreaming ? 'Pause Wage Stream' : 'Initiate Wage Stream'}
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ padding: 12 }}
+                    onClick={() => {
+                      setStreamAccumulated(0);
+                      toast('Stream accumulated reset.');
+                    }}
+                  >
+                    Reset Accumulator
+                  </button>
+                </div>
+              </div>
+
             </div>
           </div>
 

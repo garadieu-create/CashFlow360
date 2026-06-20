@@ -7,6 +7,7 @@ import { ModalProvider } from '@/context/ModalContext';
 import { GlobalModal } from '@/components/ui/GlobalModal';
 import { useLowBalanceWatcher } from '@/hooks/useOnChainData';
 import { CircleWalletProvider } from '@/context/CircleWalletContext';
+import { LoadingProvider } from '@/components/providers/LoadingProvider';
 
 const queryClient = new QueryClient();
 
@@ -20,11 +21,13 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <CircleWalletProvider>
-          <ModalProvider>
-            <LowBalanceWatcher />
-            {children}
-            <GlobalModal />
-          </ModalProvider>
+          <LoadingProvider>
+            <ModalProvider>
+              <LowBalanceWatcher />
+              {children}
+              <GlobalModal />
+            </ModalProvider>
+          </LoadingProvider>
         </CircleWalletProvider>
       </QueryClientProvider>
     </WagmiProvider>

@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Activity, Wallet } from 'lucide-react';
 import { Transaction } from '@/hooks/useOnChainData';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
+import { Skeleton } from '@/components/ui/LoadingSystem';
 
 function formatUSD(val: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -47,8 +48,12 @@ export function StatGrid({ usdcBalance, loadingUSDC, loadingTx, metrics, transac
             guidance="Keep enough USDC on Arc to cover immediate operational runway. Use the bridge to rebalance from Ethereum or Base."
           />
         </div>
-        <div className={`stat-value ${loadingUSDC ? 'skeleton' : ''}`} style={{ display: 'inline-block', minWidth: 100 }}>
-          {loadingUSDC ? '0.00' : `$${parseFloat(usdcBalance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+        <div className="stat-value" style={{ display: 'flex', alignItems: 'center', minHeight: '35px' }}>
+          {loadingUSDC ? (
+            <Skeleton width="120px" height="28px" />
+          ) : (
+            `$${parseFloat(usdcBalance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+          )}
         </div>
         <div className="stat-change up">
           Arc Testnet
@@ -75,8 +80,12 @@ export function StatGrid({ usdcBalance, loadingUSDC, loadingTx, metrics, transac
             guidance="Analyze customer payment frequency. If inflows are sporadic, negotiate upfront milestones with clients."
           />
         </div>
-        <div className={`stat-value positive ${loadingTx ? 'skeleton' : ''}`} style={{ display: 'inline-block', minWidth: 100 }}>
-          {loadingTx ? '0.00' : formatUSD(metrics.totalInflow)}
+        <div className="stat-value positive" style={{ display: 'flex', alignItems: 'center', minHeight: '35px' }}>
+          {loadingTx ? (
+            <Skeleton width="140px" height="28px" />
+          ) : (
+            formatUSD(metrics.totalInflow)
+          )}
         </div>
         <div className="stat-change up">
           <TrendingUp size={12} />
@@ -104,8 +113,12 @@ export function StatGrid({ usdcBalance, loadingUSDC, loadingTx, metrics, transac
             guidance="Review vendor contracts and subscriptions. Automate recurring payouts to smooth out lumpy outflows."
           />
         </div>
-        <div className={`stat-value negative ${loadingTx ? 'skeleton' : ''}`} style={{ display: 'inline-block', minWidth: 100 }}>
-          {loadingTx ? '0.00' : formatUSD(metrics.totalOutflow)}
+        <div className="stat-value negative" style={{ display: 'flex', alignItems: 'center', minHeight: '35px' }}>
+          {loadingTx ? (
+            <Skeleton width="140px" height="28px" />
+          ) : (
+            formatUSD(metrics.totalOutflow)
+          )}
         </div>
         <div className="stat-change down">
           <TrendingDown size={12} />
@@ -133,8 +146,12 @@ export function StatGrid({ usdcBalance, loadingUSDC, loadingTx, metrics, transac
             guidance="If Net Flow is persistently negative, use the Runway Calculator to simulate cost reductions or bridge capital."
           />
         </div>
-        <div className={`stat-value ${loadingTx ? 'skeleton' : metrics.netFlow >= 0 ? 'positive' : 'negative'}`} style={{ display: 'inline-block', minWidth: 100 }}>
-          {loadingTx ? '0.00' : `${metrics.netFlow >= 0 ? '+' : ''}${formatUSD(metrics.netFlow)}`}
+        <div className={`stat-value ${metrics.netFlow >= 0 ? 'positive' : 'negative'}`} style={{ display: 'flex', alignItems: 'center', minHeight: '35px' }}>
+          {loadingTx ? (
+            <Skeleton width="150px" height="28px" />
+          ) : (
+            `${metrics.netFlow >= 0 ? '+' : ''}${formatUSD(metrics.netFlow)}`
+          )}
         </div>
         <div className={`stat-change ${metrics.netFlow >= 0 ? 'up' : 'down'}`}>
           {metrics.netFlow >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}

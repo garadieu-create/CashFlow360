@@ -106,11 +106,11 @@ export function ApiCredentials() {
           signerAddress = '0x0000000000000000000000000000000000000000';
         }
 
-        const realSignature = Buffer.from(JSON.stringify({
+        const realSignature = btoa(JSON.stringify({
           signature: signatureStr,
           signer: signerAddress,
           invoiceId: data1.requirements[0].invoiceId
-        })).toString('base64');
+        }));
 
         setSimLogs(prev => [
           ...prev,

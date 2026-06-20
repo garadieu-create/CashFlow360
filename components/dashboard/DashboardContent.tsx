@@ -11,6 +11,7 @@ import { MultiBalanceBar } from './MultiBalanceBar';
 import { OnboardingTour } from '@/components/ui/OnboardingTour';
 import { VaultCard } from './VaultCard';
 import { AgentSettings } from './AgentSettings';
+import toast from 'react-hot-toast';
 
 function formatUSD(val: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -27,7 +28,7 @@ export default function DashboardContent() {
   const { formatted: vaultUSDCBalance, refetch: refetchVaultBalance } = useVaultBalance();
   const { formatted: eurcBalance } = useEURCBalance();
   const { formatted: nativeBalance } = useNativeBalance();
-  const { transactions, isLoading: loadingTx, refetch: refetchTx } = useTransactionHistory();
+  const { transactions, isLoading: loadingTx, refetch: refetchTx, isDemo } = useTransactionHistory();
   const metrics = useCashFlowMetrics(transactions);
 
   if (!isConnected) {
@@ -46,6 +47,50 @@ export default function DashboardContent() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
+      {isDemo && (
+        <div style={{
+          background: 'rgba(59, 130, 246, 0.05)',
+          border: '2px dashed #3B82F6',
+          padding: '16px 20px',
+          marginBottom: '24px',
+          color: 'var(--text-primary)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 16,
+          boxShadow: '4px 4px 0px rgba(0,0,0,0.9)',
+          fontFamily: 'var(--font-mono)'
+        }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#3B82F6', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>ℹ️</span> SANDBOX DEMO MODE ACTIVE
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.4 }}>
+              Showing simulated historical transactions and active cash streams. To test live updates, copy your smart account address and transfer Arc Testnet USDC.
+            </div>
+          </div>
+          <button 
+            className="btn btn-secondary btn-sm" 
+            style={{ 
+              borderColor: 'rgba(59, 130, 246, 0.3)', 
+              color: '#3B82F6',
+              whiteSpace: 'nowrap',
+              padding: '6px 12px',
+              fontSize: '11px',
+              fontWeight: 800
+            }}
+            onClick={() => {
+              if (typeof navigator !== 'undefined' && address) {
+                navigator.clipboard.writeText(address);
+                toast.success('Smart Wallet address copied! Send Arc Testnet USDC to exit Demo Mode.');
+              }
+            }}
+          >
+            Copy Address
+          </button>
+        </div>
+      )}
+
       {/* Neo-Brutalist Architectural Hero Block */}
       <div className="brutalist-hero" style={{
         display: 'grid',

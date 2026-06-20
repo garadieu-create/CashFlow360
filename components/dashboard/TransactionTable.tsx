@@ -3,6 +3,7 @@
 import { Transaction } from '@/hooks/useOnChainData';
 import { getExplorerTxUrl } from '@/lib/arc-config';
 import { ExternalLink, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { LoadingTable } from '@/components/ui/LoadingSystem';
 
 interface Props {
   transactions: Transaction[];
@@ -12,8 +13,8 @@ interface Props {
 export default function TransactionTable({ transactions, isLoading }: Props) {
   if (isLoading) {
     return (
-      <div className="card-body" style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-3xl)' }}>
-        <div className="spinner" />
+      <div className="card-body" style={{ padding: 0 }}>
+        <LoadingTable rows={6} cols={6} />
       </div>
     );
   }

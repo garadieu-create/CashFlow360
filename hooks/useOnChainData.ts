@@ -90,13 +90,18 @@ export function useUSDCBalance() {
     },
   });
 
-  const formatted = balance ? formatUnits(balance as bigint, USDC_DECIMALS) : '0.00';
+  const { isDemo } = useTransactionHistory();
+
+  const formatted = isDemo 
+    ? '14,250.00' 
+    : (balance ? formatUnits(balance as bigint, USDC_DECIMALS) : '0.00');
 
   return {
-    balance: balance as bigint | undefined,
+    balance: isDemo ? 14250000000n : (balance as bigint | undefined),
     formatted,
-    isLoading,
+    isLoading: isDemo ? false : isLoading,
     refetch,
+    isDemo,
   };
 }
 
@@ -115,13 +120,18 @@ export function useVaultBalance() {
     },
   });
 
-  const formatted = balance ? formatUnits(balance as bigint, USDC_DECIMALS) : '0.00';
+  const { isDemo } = useTransactionHistory();
+
+  const formatted = isDemo 
+    ? '25,000.00' 
+    : (balance ? formatUnits(balance as bigint, USDC_DECIMALS) : '0.00');
 
   return {
-    balance: balance as bigint | undefined,
+    balance: isDemo ? 25000000000n : (balance as bigint | undefined),
     formatted,
-    isLoading,
+    isLoading: isDemo ? false : isLoading,
     refetch,
+    isDemo,
   };
 }
 
@@ -140,9 +150,18 @@ export function useEURCBalance() {
     },
   });
 
-  const formatted = balance ? formatUnits(balance as bigint, USDC_DECIMALS) : '0.00';
+  const { isDemo } = useTransactionHistory();
 
-  return { balance: balance as bigint | undefined, formatted, isLoading };
+  const formatted = isDemo 
+    ? '3,200.00' 
+    : (balance ? formatUnits(balance as bigint, USDC_DECIMALS) : '0.00');
+
+  return { 
+    balance: isDemo ? 3200000000n : (balance as bigint | undefined), 
+    formatted, 
+    isLoading: isDemo ? false : isLoading,
+    isDemo
+  };
 }
 
 export function useNativeBalance() {
@@ -157,11 +176,14 @@ export function useNativeBalance() {
     },
   });
 
+  const { isDemo } = useTransactionHistory();
+
   return {
-    balance: data?.value,
-    formatted: data?.formatted || '0.00',
+    balance: isDemo ? 150000000n : data?.value,
+    formatted: isDemo ? '150.00' : (data?.formatted || '0.00'),
     symbol: data?.symbol || 'USDC',
-    isLoading,
+    isLoading: isDemo ? false : isLoading,
+    isDemo,
   };
 }
 
@@ -397,9 +419,9 @@ export function useTransactionHistory() {
   const query = useQuery({
     queryKey: ['transactions', address],
     queryFn: async () => {
-      if (!address) return [];
+      if (!address) return { txs: [], isDemo: false };
 
-      const response = await fetch('/api/indexer', {
+      const response = await fetch(`/api/indexer?address=${address}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -442,6 +464,7 @@ export function useTransactionHistory() {
       const deposits = data.deposits || [];
       const withdrawals = data.withdrawals || [];
       const transfers = data.transfers || [];
+      const isDemo = result.indexerStatus?.isDemoMode || false;
 
       const txs: Transaction[] = [];
 
@@ -497,7 +520,7 @@ export function useTransactionHistory() {
       });
 
       txs.sort((a, b) => b.timestamp - a.timestamp);
-      return txs;
+      return { txs, isDemo };
     },
     enabled: !!address,
     refetchInterval: 10000,
@@ -505,7 +528,8 @@ export function useTransactionHistory() {
   });
 
   return { 
-    transactions: query.data || [], 
+    transactions: query.data?.txs || [], 
+    isDemo: query.data?.isDemo || false,
     isLoading: query.isLoading, 
     refetch: query.refetch 
   };
@@ -575,10 +599,58 @@ export function usePayrollJobs() {
     },
   });
 
+  const { isDemo } = useTransactionHistory();
+
+  const mockJobs = [
+    {
+      id: 1n,
+      client: address || '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b',
+      contractor: '0x4296ca872Ac721e648DBeB9Fd6FA46C396d6Aad',
+      paymentAmount: 3500000000n, // $3500 USDC
+      status: 1, // Escrow Active
+      createdAt: BigInt(Math.floor(Date.now() / 1000) - 5 * 86400)
+    },
+    {
+      id: 2n,
+      client: address || '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b',
+      contractor: '0x18a38F6D657bCaA73b2241eC00f53ebF6B58512f',
+      paymentAmount: 1200000000n, // $1200 USDC
+      status: 2, // Settled
+      createdAt: BigInt(Math.floor(Date.now() / 1000) - 12 * 86400)
+    },
+    {
+      id: 3n,
+      client: address || '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b',
+      contractor: '0xbc8e472Ac721e648DBeB9Fd6FA46C396d6Aad887c',
+      paymentAmount: 8000000000n, // $8000 USDC
+      status: 1, // Escrow Active
+      createdAt: BigInt(Math.floor(Date.now() / 1000) - 2 * 86400)
+    },
+    {
+      id: 4n,
+      client: address || '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b',
+      contractor: '0x712aE72Ac721e648DBeB9Fd6FA46C396d6Aad888c',
+      paymentAmount: 2500000000n, // $2500 USDC
+      status: 3, // Disputed
+      createdAt: BigInt(Math.floor(Date.now() / 1000) - 8 * 86400)
+    },
+    {
+      id: 5n,
+      client: address || '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b',
+      contractor: '0xda91E72Ac721e648DBeB9Fd6FA46C396d6Aad999e',
+      paymentAmount: 500000000n, // $500 USDC
+      status: 0, // Funding Pending
+      createdAt: BigInt(Math.floor(Date.now() / 1000) - 1 * 86400)
+    }
+  ];
+
+  const finalJobs = (jobs && jobs.length > 0) ? jobs : (isDemo ? mockJobs : []);
+
   return {
-    jobs: (jobs || []) as any[],
-    isLoading,
+    jobs: finalJobs as any[],
+    isLoading: (jobs && jobs.length > 0) ? false : (isDemo ? false : isLoading),
     refetch,
+    isDemo: (jobs && jobs.length > 0) ? false : isDemo
   };
 }
 
@@ -690,13 +762,61 @@ export function useMultiSigRequests() {
     enabled: !!publicClient && count !== undefined,
   });
 
+  const { isDemo } = useTransactionHistory();
+
+  const mockRequests: MultiSigRequest[] = [
+    {
+      id: 0,
+      creator: '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b',
+      to: '0x8704caa872Ac721e648DBeB9Fd6FA46C396d6Aad',
+      amount: '15000.00',
+      category: 'Hosting & Infrastructure',
+      executed: false,
+      ownerApproved: true,
+      coSignerApproved: false
+    },
+    {
+      id: 1,
+      creator: '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b',
+      to: '0x51c9dDdB6a900fa2b585dd299e03d12FA4293BC',
+      amount: '12500.00',
+      category: 'SaaS Security Audit',
+      executed: false,
+      ownerApproved: false,
+      coSignerApproved: false
+    },
+    {
+      id: 2,
+      creator: '0x2724caa872Ac721e648DBeB9Fd6FA46C396d6Aad',
+      to: '0x321aD72Ac721e648DBeB9Fd6FA46C396d6Aad888e',
+      amount: '20000.00',
+      category: 'Liquidity Provision',
+      executed: true,
+      ownerApproved: true,
+      coSignerApproved: true
+    },
+    {
+      id: 3,
+      creator: '0x2724caa872Ac721e648DBeB9Fd6FA46C396d6Aad',
+      to: '0x9812E72Ac721e648DBeB9Fd6FA46C396d6Aad777d',
+      amount: '8500.00',
+      category: 'Agent Fuel Topup',
+      executed: true,
+      ownerApproved: true,
+      coSignerApproved: true
+    }
+  ];
+
+  const finalRequests = (query.data && query.data.length > 0) ? query.data : (isDemo ? mockRequests : []);
+
   return {
-    requests: query.data || [],
-    isLoading: countLoading || query.isLoading,
+    requests: finalRequests,
+    isLoading: (query.data && query.data.length > 0) ? false : (isDemo ? false : (countLoading || query.isLoading)),
     refetch: () => {
       refetch();
       query.refetch();
-    }
+    },
+    isDemo: (query.data && query.data.length > 0) ? false : isDemo
   };
 }
 

@@ -40,3 +40,7 @@ next-env.d.ts
 *.db
 agent/*.db
 agent/agent.db
+
+# logs
+build.log
+

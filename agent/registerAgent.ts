@@ -38,8 +38,32 @@ async function registerAgent() {
   console.log(`  - Type: "Treasury Manager"`);
   console.log(`  - Standard: "ERC-8004 Trustless Agent Identity"`);
   
+  // Load environment variables if not loaded
+  const envPath = path.join(process.cwd(), '.env.local');
+  const envFallbackPath = path.join(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) {
+    const content = fs.readFileSync(envPath, 'utf8');
+    content.split('\n').forEach(line => {
+      const parts = line.trim().split('=');
+      if (parts.length >= 2 && !parts[0].startsWith('#')) {
+        process.env[parts[0].trim()] = parts.slice(1).join('=').trim().replace(/(^['"]|['"]$)/g, '');
+      }
+    });
+  } else if (fs.existsSync(envFallbackPath)) {
+    const content = fs.readFileSync(envFallbackPath, 'utf8');
+    content.split('\n').forEach(line => {
+      const parts = line.trim().split('=');
+      if (parts.length >= 2 && !parts[0].startsWith('#')) {
+        process.env[parts[0].trim()] = parts.slice(1).join('=').trim().replace(/(^['"]|['"]$)/g, '');
+      }
+    });
+  }
+
   // 2. Execute a real identity registration transaction on Arc Testnet
-  const deployerKey = '0x920df0748032d4d324be4e2171414365661733c008a67d05edc43001aa67ff13';
+  const deployerKey = process.env.DEPLOYER_PRIVATE_KEY;
+  if (!deployerKey) {
+    throw new Error('DEPLOYER_PRIVATE_KEY environment variable is not defined.');
+  }
   const reputationScore = 98; // ERC-8004 reputation score (out of 100)
   
   console.log(`Connecting to Arc Testnet RPC: https://rpc.testnet.arc.network...`);

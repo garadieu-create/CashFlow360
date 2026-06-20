@@ -77,140 +77,150 @@ export default function SankeyDiagram({ transactions }: { transactions: Transact
     if (!containerRef.current || nodes.length === 0) return;
 
     const container = containerRef.current;
-    const width = container.clientWidth;
-    const height = Math.max(400, nodes.length * 40);
 
-    // Manual Sankey layout (no d3-sankey dependency issues)
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('width', String(width));
-    svg.setAttribute('height', String(height));
-    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    const renderSankey = () => {
+      const width = container.clientWidth;
+      const height = Math.max(400, nodes.length * 40);
 
-    const nodeWidth = 20;
-    const nodePadding = 12;
-    const margin = { left: 120, right: 120, top: 20, bottom: 20 };
+      // Manual Sankey layout (no d3-sankey dependency issues)
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', String(width));
+      svg.setAttribute('height', String(height));
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
-    // Classify nodes into columns
-    const sourceIndices = new Set(links.map(l => l.source));
-    const targetIndices = new Set(links.map(l => l.target));
+      const nodeWidth = 20;
+      const nodePadding = 12;
+      const margin = { left: 120, right: 120, top: 20, bottom: 20 };
 
-    // Column assignment: sources (left), treasury (center), destinations (right)
-    const columns: number[][] = [[], [], []];
-    nodes.forEach((_, i) => {
-      const isSource = sourceIndices.has(i) && !targetIndices.has(i);
-      const isTarget = targetIndices.has(i) && !sourceIndices.has(i);
-      if (isSource) columns[0].push(i);
-      else if (isTarget) columns[2].push(i);
-      else columns[1].push(i); // treasury (both)
-    });
+      // Classify nodes into columns
+      const sourceIndices = new Set(links.map(l => l.source));
+      const targetIndices = new Set(links.map(l => l.target));
 
-    const colX = [margin.left, width / 2 - nodeWidth / 2, width - margin.right - nodeWidth];
-
-    // Compute node heights
-    const totalValue = links.reduce((sum, l) => sum + l.value, 0) || 1;
-    const availableHeight = height - margin.top - margin.bottom;
-
-    const nodePositions: { x: number; y: number; h: number }[] = new Array(nodes.length);
-
-    for (let col = 0; col < 3; col++) {
-      const nodeIds = columns[col];
-      if (nodeIds.length === 0) continue;
-
-      const nodeValues = nodeIds.map(id => {
-        const linksIn = links.filter(l => l.target === id).reduce((s, l) => s + l.value, 0);
-        const linksOut = links.filter(l => l.source === id).reduce((s, l) => s + l.value, 0);
-        return Math.max(linksIn, linksOut);
+      // Column assignment: sources (left), treasury (center), destinations (right)
+      const columns: number[][] = [[], [], []];
+      nodes.forEach((_, i) => {
+        const isSource = sourceIndices.has(i) && !targetIndices.has(i);
+        const isTarget = targetIndices.has(i) && !sourceIndices.has(i);
+        if (isSource) columns[0].push(i);
+        else if (isTarget) columns[2].push(i);
+        else columns[1].push(i); // treasury (both)
       });
 
-      const totalNodeValue = nodeValues.reduce((s, v) => s + v, 0) || 1;
-      const totalPadding = (nodeIds.length - 1) * nodePadding;
-      const usableHeight = availableHeight - totalPadding;
+      const colX = [margin.left, width / 2 - nodeWidth / 2, width - margin.right - nodeWidth];
 
-      let y = margin.top;
-      nodeIds.forEach((id, i) => {
-        const h = Math.max(8, (nodeValues[i] / totalNodeValue) * usableHeight);
-        nodePositions[id] = { x: colX[col], y, h };
-        y += h + nodePadding;
-      });
-    }
+      // Compute node heights
+      const totalValue = links.reduce((sum, l) => sum + l.value, 0) || 1;
+      const availableHeight = height - margin.top - margin.bottom;
 
-    // Draw links
-    links.forEach(link => {
-      const src = nodePositions[link.source];
-      const tgt = nodePositions[link.target];
-      if (!src || !tgt) return;
+      const nodePositions: { x: number; y: number; h: number }[] = new Array(nodes.length);
 
-      const linkHeight = Math.max(2, (link.value / totalValue) * (availableHeight * 0.5));
-      const srcY = src.y + src.h / 2;
-      const tgtY = tgt.y + tgt.h / 2;
+      for (let col = 0; col < 3; col++) {
+        const nodeIds = columns[col];
+        if (nodeIds.length === 0) continue;
 
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      const midX = (src.x + nodeWidth + tgt.x) / 2;
-      const d = `M${src.x + nodeWidth},${srcY} C${midX},${srcY} ${midX},${tgtY} ${tgt.x},${tgtY}`;
-      path.setAttribute('d', d);
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke', nodes[link.source].color);
-      path.setAttribute('stroke-width', String(Math.max(2, linkHeight)));
-      path.setAttribute('stroke-opacity', '0.25');
-      path.setAttribute('class', 'sankey-link');
+        const nodeValues = nodeIds.map(id => {
+          const linksIn = links.filter(l => l.target === id).reduce((s, l) => s + l.value, 0);
+          const linksOut = links.filter(l => l.source === id).reduce((s, l) => s + l.value, 0);
+          return Math.max(linksIn, linksOut);
+        });
 
-      // Animate safely
-      let length = 500;
-      try {
-        if (typeof path.getTotalLength === 'function') {
-          // Some browsers require the path to be in the DOM to call getTotalLength, so we try-catch
-          length = path.getTotalLength() || 500;
+        const totalNodeValue = nodeValues.reduce((s, v) => s + v, 0) || 1;
+        const totalPadding = (nodeIds.length - 1) * nodePadding;
+        const usableHeight = availableHeight - totalPadding;
+
+        let y = margin.top;
+        nodeIds.forEach((id, i) => {
+          const h = Math.max(8, (nodeValues[i] / totalNodeValue) * usableHeight);
+          nodePositions[id] = { x: colX[col], y, h };
+          y += h + nodePadding;
+        });
+      }
+
+      // Draw links
+      links.forEach(link => {
+        const src = nodePositions[link.source];
+        const tgt = nodePositions[link.target];
+        if (!src || !tgt) return;
+
+        const linkHeight = Math.max(2, (link.value / totalValue) * (availableHeight * 0.5));
+        const srcY = src.y + src.h / 2;
+        const tgtY = tgt.y + tgt.h / 2;
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const midX = (src.x + nodeWidth + tgt.x) / 2;
+        const d = `M${src.x + nodeWidth},${srcY} C${midX},${srcY} ${midX},${tgtY} ${tgt.x},${tgtY}`;
+        path.setAttribute('d', d);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', nodes[link.source].color);
+        path.setAttribute('stroke-width', String(Math.max(2, linkHeight)));
+        path.setAttribute('stroke-opacity', '0.25');
+        path.setAttribute('class', 'sankey-link');
+
+        // Animate safely
+        let length = 500;
+        try {
+          if (typeof path.getTotalLength === 'function') {
+            length = path.getTotalLength() || 500;
+          }
+        } catch (e) {
+          length = 500;
         }
-      } catch (e) {
-        length = 500;
-      }
-      path.style.strokeDasharray = `${length}`;
-      path.style.strokeDashoffset = `${length}`;
-      path.style.animation = `sankey-draw 1.5s ease forwards`;
+        path.style.strokeDasharray = `${length}`;
+        path.style.strokeDashoffset = `${length}`;
+        path.style.animation = `sankey-draw 1.5s ease forwards`;
 
-      svg.appendChild(path);
+        svg.appendChild(path);
+      });
+
+      // Draw nodes
+      nodes.forEach((node, i) => {
+        const pos = nodePositions[i];
+        if (!pos) return;
+
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', String(pos.x));
+        rect.setAttribute('y', String(pos.y));
+        rect.setAttribute('width', String(nodeWidth));
+        rect.setAttribute('height', String(Math.max(8, pos.h)));
+        rect.setAttribute('rx', '4');
+        rect.setAttribute('fill', node.color);
+        rect.setAttribute('fill-opacity', '0.9');
+        rect.setAttribute('class', 'sankey-node');
+        svg.appendChild(rect);
+
+        // Label
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        const isLeft = pos.x < width / 2;
+        text.setAttribute('x', String(isLeft ? pos.x - 8 : pos.x + nodeWidth + 8));
+        text.setAttribute('y', String(pos.y + Math.max(8, pos.h) / 2 + 4));
+        text.setAttribute('text-anchor', isLeft ? 'end' : 'start');
+        text.setAttribute('class', 'sankey-label');
+        text.textContent = node.name;
+        svg.appendChild(text);
+      });
+
+      // Add animation keyframes
+      const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+      style.textContent = `
+        @keyframes sankey-draw {
+          to { stroke-dashoffset: 0; }
+        }
+      `;
+      svg.appendChild(style);
+
+      container.innerHTML = '';
+      container.appendChild(svg);
+    };
+
+    renderSankey();
+
+    const resizeObserver = new ResizeObserver(() => {
+      renderSankey();
     });
-
-    // Draw nodes
-    nodes.forEach((node, i) => {
-      const pos = nodePositions[i];
-      if (!pos) return;
-
-      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      rect.setAttribute('x', String(pos.x));
-      rect.setAttribute('y', String(pos.y));
-      rect.setAttribute('width', String(nodeWidth));
-      rect.setAttribute('height', String(Math.max(8, pos.h)));
-      rect.setAttribute('rx', '4');
-      rect.setAttribute('fill', node.color);
-      rect.setAttribute('fill-opacity', '0.9');
-      rect.setAttribute('class', 'sankey-node');
-      svg.appendChild(rect);
-
-      // Label
-      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      const isLeft = pos.x < width / 2;
-      text.setAttribute('x', String(isLeft ? pos.x - 8 : pos.x + nodeWidth + 8));
-      text.setAttribute('y', String(pos.y + Math.max(8, pos.h) / 2 + 4));
-      text.setAttribute('text-anchor', isLeft ? 'end' : 'start');
-      text.setAttribute('class', 'sankey-label');
-      text.textContent = node.name;
-      svg.appendChild(text);
-    });
-
-    // Add animation keyframes
-    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    style.textContent = `
-      @keyframes sankey-draw {
-        to { stroke-dashoffset: 0; }
-      }
-    `;
-    svg.appendChild(style);
-
-    container.innerHTML = '';
-    container.appendChild(svg);
+    resizeObserver.observe(container);
 
     return () => {
+      resizeObserver.disconnect();
       container.innerHTML = '';
     };
   }, [nodes, links]);

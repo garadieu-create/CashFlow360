@@ -3,6 +3,7 @@
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
 import { useState, useEffect, useRef } from 'react';
+import RelatedContent from '@/components/ui/RelatedContent';
 import { motion } from 'framer-motion';
 import { 
   Terminal, 
@@ -19,6 +20,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { LoadingButton, Skeleton } from '@/components/ui/LoadingSystem';
 
 interface Log {
   timestamp: number;
@@ -100,7 +102,7 @@ export default function SwarmPage() {
   return (
     <div className="app-layout">
       <Sidebar />
-      <main className="app-main">
+      <main className="app-main" id="main-content">
         <Topbar title="Multi-Agent Swarm" />
         <div className="app-content">
           
@@ -131,19 +133,15 @@ export default function SwarmPage() {
                   {mode}
                 </span>
               </div>
-              <button 
-                className="btn btn-primary" 
-                style={{ width: '100%', gap: 8 }}
+              <LoadingButton 
+                variant="primary" 
+                style={{ width: '100%' }}
                 onClick={handleRunSwarm}
-                disabled={isSimulating}
+                isLoading={isSimulating}
+                loadingText="Running Swarm..."
               >
-                {isSimulating ? (
-                  <RefreshCw className="spinning" size={16} />
-                ) : (
-                  <Play size={16} />
-                )}
-                Trigger Swarm Evaluation
-              </button>
+                <Play size={16} /> Trigger Swarm Evaluation
+              </LoadingButton>
             </div>
           </div>
 
@@ -339,8 +337,12 @@ export default function SwarmPage() {
                 color: '#E2E8F0'
               }}>
                 {isLoading ? (
-                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                    <RefreshCw className="spinning" size={24} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
+                    <Skeleton width="100%" height="20px" />
+                    <Skeleton width="90%" height="20px" />
+                    <Skeleton width="95%" height="20px" />
+                    <Skeleton width="75%" height="20px" />
+                    <Skeleton width="85%" height="20px" />
                   </div>
                 ) : logs.length > 0 ? (
                   logs.map((log, idx) => (
@@ -363,7 +365,7 @@ export default function SwarmPage() {
               </div>
             </div>
           )}
-
+          <RelatedContent />
         </div>
       </main>
     </div>

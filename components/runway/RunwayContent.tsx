@@ -178,7 +178,7 @@ export default function RunwayContent() {
       </motion.div>
 
       {/* Stats Row */}
-      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 'var(--space-xl)' }}>
+      <div className="stat-grid" style={{ marginBottom: 'var(--space-xl)' }}>
         <div className="stat-card">
           <div className="stat-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span>Current Balance</span>

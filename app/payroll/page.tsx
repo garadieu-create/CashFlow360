@@ -2,6 +2,7 @@
 
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
+import RelatedContent from '@/components/ui/RelatedContent';
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -32,13 +33,17 @@ import { USDC_ADDRESS } from '@/lib/arc-config';
 import { USDC_ABI, PAYROLL_JOB_ADDRESS } from '@/lib/contracts';
 import { parseUnits, formatUnits } from 'viem';
 import toast from 'react-hot-toast';
+import { useModal } from '@/context/ModalContext';
+import { ModalPortal, ModalOverlay, Modal, ModalHeader, ModalIcon, ModalBody } from '@/components/ui/modal/ModalBase';
+import { LoadingTable, LoadingButton } from '@/components/ui/LoadingSystem';
 
 export default function PayrollPage() {
   const { address, isConnected } = useAccount();
-  const { jobs, isLoading: loadingJobs, refetch: refetchJobs } = usePayrollJobs();
+  const { jobs, isLoading: loadingJobs, refetch: refetchJobs, isDemo } = usePayrollJobs();
   const { createJob, fundJob, releasePayment, disputeJob } = usePayrollJobOperations();
   const { balance: rawUSDCBalance, refetch: refetchBalance } = useUSDCBalance();
   const { writeContractAsync: approveAsync } = useWriteContract();
+  const { openModal, updateModal, closeModal, triggerGlobalError } = useModal();
 
   // Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -114,84 +119,220 @@ export default function PayrollPage() {
       return;
     }
 
-    setIsSubmitting(true);
-    const toastId = toast.loading('Initiating contractor payroll agreement...');
+    setShowCreateModal(false);
+
+    const modalId = openModal({
+      type: 'transaction',
+      title: 'Initiating Payroll Agreement',
+      description: `Initializing contractor payroll agreement of ${paymentAmount} USDC for contractor ${contractorAddress.slice(0, 6)}...${contractorAddress.slice(-4)}.`,
+      badge: 'Escrow Initialization',
+      txStatus: 'pending',
+      txSteps: [{ label: 'Initiating contractor payroll agreement', status: 'pending' }],
+      isDismissable: false
+    });
+
     try {
       const parsedAmount = parseUnits(paymentAmount, 6);
       await createJob(contractorAddress, parsedAmount);
-      toast.success('Agreement created! Proceeding to fund escrow.', { id: toastId });
-      setShowCreateModal(false);
+
+      updateModal(modalId, {
+        type: 'success',
+        txStatus: 'success',
+        title: 'Agreement Created',
+        description: `Contractor agreement created successfully! Proceed to fund the escrow to secure funds.`,
+        badge: 'Agreement Initialized',
+        txSteps: [{ label: 'Initiating contractor payroll agreement', status: 'success' }],
+        isDismissable: true,
+        buttons: [{ label: 'Close', variant: 'secondary', closeModalAfterClick: true }]
+      });
+
       setContractorAddress('');
       setPaymentAmount('');
       refetchJobs();
     } catch (err: any) {
-      toast.error(err.message || 'Agreement initialization failed.', { id: toastId });
-    } finally {
-      setIsSubmitting(false);
+      closeModal(modalId);
+      triggerGlobalError(err);
     }
   };
 
   const handleFundEscrow = async (jobId: number, amountRaw: bigint) => {
-    setPendingJobId(jobId);
-    const toastId = toast.loading('Funding escrow contract...');
+    const amountFormatted = formatUnits(amountRaw, 6);
+    const modalId = openModal({
+      type: 'transaction',
+      title: 'Fund Escrow Contract',
+      description: `Funding escrow #${jobId} with ${amountFormatted} USDC to lock payments.`,
+      badge: 'Escrow Deposit',
+      txStatus: 'pending',
+      txSteps: [
+        { label: 'Checking and requesting USDC allowance', status: 'pending' },
+        { label: 'Sending escrow deposit transaction', status: 'idle' }
+      ],
+      isDismissable: false
+    });
+
     try {
       // Check if allowance is sufficient
       if (allowance === undefined || allowance < amountRaw) {
-        toast.loading('Requesting approval for USDC transfers...', { id: toastId });
+        updateModal(modalId, {
+          txSteps: [
+            { label: 'Requesting USDC approval in wallet', status: 'pending' },
+            { label: 'Sending escrow deposit transaction', status: 'idle' }
+          ]
+        });
+
         await approveAsync({
           address: USDC_ADDRESS,
           abi: USDC_ABI,
           functionName: 'approve',
           args: [PAYROLL_JOB_ADDRESS, amountRaw],
         });
-        toast.loading('USDC Approved! Sending escrow deposit...', { id: toastId });
+
+        updateModal(modalId, {
+          txSteps: [
+            { label: 'USDC approved and allowance set', status: 'success' },
+            { label: 'Sending escrow deposit transaction', status: 'pending' }
+          ]
+        });
+
         await new Promise(r => setTimeout(r, 2000));
         refetchAllowance();
+      } else {
+        updateModal(modalId, {
+          txSteps: [
+            { label: 'USDC allowance already sufficient', status: 'success' },
+            { label: 'Sending escrow deposit transaction', status: 'pending' }
+          ]
+        });
       }
 
       await fundJob(BigInt(jobId));
-      toast.success('Escrow funded successfully! Funds locked in job contract.', { id: toastId });
+
+      updateModal(modalId, {
+        type: 'success',
+        txStatus: 'success',
+        title: 'Escrow Funded Successfully',
+        description: `Escrow for job #${jobId} funded successfully! Funds are now locked.`,
+        badge: 'Secure Escrow Locked',
+        txSteps: [
+          { label: 'USDC approved and allowance set', status: 'success' },
+          { label: 'Escrow funded on-chain', status: 'success' }
+        ],
+        isDismissable: true,
+        buttons: [{ label: 'Close', variant: 'secondary', closeModalAfterClick: true }]
+      });
+
       setTimeout(() => {
         refetchJobs();
         refetchBalance();
         refetchAllowance();
-      }, 2000);
+      }, 1000);
     } catch (err: any) {
-      toast.error(err.message || 'Escrow funding failed.', { id: toastId });
-    } finally {
-      setPendingJobId(null);
+      closeModal(modalId);
+      triggerGlobalError(err);
     }
   };
 
-  const handleReleasePayment = async (jobId: number) => {
-    setPendingJobId(jobId);
-    const toastId = toast.loading('Releasing escrow payment to contractor...');
-    try {
-      await releasePayment(BigInt(jobId));
-      toast.success('Payroll released! Contractor paid in full.', { id: toastId });
-      setTimeout(() => {
-        refetchJobs();
-        refetchBalance();
-      }, 2000);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to release escrow payment.', { id: toastId });
-    } finally {
-      setPendingJobId(null);
-    }
+  const handleReleasePayment = (jobId: number, amount: string, contractor: string) => {
+    openModal({
+      type: 'confirm',
+      title: 'Release Escrow Payment?',
+      description: `Are you sure you want to release ${parseFloat(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} USDC to contractor ${contractor}? This will immediately transfer locked funds. This action is irreversible.`,
+      badge: 'Escrow Finalization',
+      buttons: [
+        {
+          label: 'Cancel',
+          variant: 'secondary',
+          closeModalAfterClick: true
+        },
+        {
+          label: 'Release Funds',
+          variant: 'primary',
+          closeModalAfterClick: true,
+          onClick: async () => {
+            const modalId = openModal({
+              type: 'transaction',
+              title: 'Releasing Escrow Payout',
+              description: `Releasing payment of ${amount} USDC to contractor.`,
+              badge: 'Treasury Outflow',
+              txStatus: 'pending',
+              txSteps: [{ label: 'Releasing escrow payment to contractor', status: 'pending' }],
+              isDismissable: false
+            });
+
+            try {
+              await releasePayment(BigInt(jobId));
+              updateModal(modalId, {
+                type: 'success',
+                txStatus: 'success',
+                title: 'Payroll Released',
+                description: `Successfully released ${amount} USDC. Contractor paid in full.`,
+                badge: 'Escrow Settled',
+                txSteps: [{ label: 'Releasing escrow payment to contractor', status: 'success' }],
+                isDismissable: true,
+                buttons: [{ label: 'Close', variant: 'secondary', closeModalAfterClick: true }]
+              });
+              setTimeout(() => {
+                refetchJobs();
+                refetchBalance();
+              }, 1000);
+            } catch (err: any) {
+              closeModal(modalId);
+              triggerGlobalError(err);
+            }
+          }
+        }
+      ]
+    });
   };
 
-  const handleDispute = async (jobId: number) => {
-    setPendingJobId(jobId);
-    const toastId = toast.loading('Initiating arbitration dispute...');
-    try {
-      await disputeJob(BigInt(jobId));
-      toast.success('Dispute locked. Awaiting arbitration resolution.', { id: toastId });
-      refetchJobs();
-    } catch (err: any) {
-      toast.error(err.message || 'Dispute execution failed.', { id: toastId });
-    } finally {
-      setPendingJobId(null);
-    }
+  const handleDispute = (jobId: number) => {
+    openModal({
+      type: 'destructive',
+      title: 'Initiate Arbitration Dispute?',
+      description: `Are you sure you want to flag job #${jobId} as disputed? This will lock all escrowed funds and prevent any payouts until resolved.`,
+      badge: 'Arbitration Gate',
+      buttons: [
+        {
+          label: 'Cancel',
+          variant: 'secondary',
+          closeModalAfterClick: true
+        },
+        {
+          label: 'Initiate Dispute',
+          variant: 'danger',
+          closeModalAfterClick: true,
+          onClick: async () => {
+            const modalId = openModal({
+              type: 'transaction',
+              title: 'Initiating Arbitration Dispute',
+              description: `Locking escrowed funds for job #${jobId} into dispute status.`,
+              badge: 'Protocol Lock',
+              txStatus: 'pending',
+              txSteps: [{ label: 'Initiating arbitration lock', status: 'pending' }],
+              isDismissable: false
+            });
+
+            try {
+              await disputeJob(BigInt(jobId));
+              updateModal(modalId, {
+                type: 'success',
+                txStatus: 'success',
+                title: 'Arbitration Locked',
+                description: `Dispute locked successfully. Escrow funds are locked pending arbitrator decision.`,
+                badge: 'Dispute Locked',
+                txSteps: [{ label: 'Initiating arbitration lock', status: 'success' }],
+                isDismissable: true,
+                buttons: [{ label: 'Close', variant: 'secondary', closeModalAfterClick: true }]
+              });
+              refetchJobs();
+            } catch (err: any) {
+              closeModal(modalId);
+              triggerGlobalError(err);
+            }
+          }
+        }
+      ]
+    });
   };
 
   const getStatusBadge = (status: number) => {
@@ -212,9 +353,34 @@ export default function PayrollPage() {
   return (
     <div className="app-layout">
       <Sidebar />
-      <main className="app-main">
+      <main className="app-main" id="main-content">
         <Topbar title="Contractor Payroll (ERC-8183)" />
         <div className="app-content">
+          {isDemo && (
+            <div style={{
+              background: 'rgba(59, 130, 246, 0.05)',
+              border: '2px dashed #3B82F6',
+              padding: '16px 20px',
+              marginBottom: '24px',
+              color: 'var(--text-primary)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 16,
+              boxShadow: '4px 4px 0px rgba(0,0,0,0.9)',
+              fontFamily: 'var(--font-mono)'
+            }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#3B82F6', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>ℹ️</span> SANDBOX DEMO MODE ACTIVE
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.4 }}>
+                  Showing simulated active payroll agreements and streams. To configure a real payroll agreement, deploy a contractor escrow job to Arc using the dashboard or smart wallets.
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="brutalist-hero" style={{
             display: 'grid',
             gridTemplateColumns: '2fr 1fr',
@@ -294,7 +460,6 @@ export default function PayrollPage() {
             </div>
           </div>
 
-          {/* Agreements Table */}
           <div className="card">
             <div className="card-header">
               <span className="card-title">Payroll Escrow Agreements</span>
@@ -302,12 +467,12 @@ export default function PayrollPage() {
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               {loadingJobs ? (
-                <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
-                  <RefreshCw className="spinning" size={24} />
+                <div style={{ padding: '24px' }}>
+                  <LoadingTable rows={4} cols={6} />
                 </div>
               ) : jobs.length > 0 ? (
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="table" style={{ width: '100%' }}>
+                <div className="table-container">
+                  <table className="table data-table" style={{ width: '100%' }}>
                     <thead>
                       <tr>
                         <th>Job ID</th>
@@ -351,25 +516,24 @@ export default function PayrollPage() {
                                     Fund Escrow
                                   </button>
                                 )}
-                                {job.status === 1 && ( // FUNDED
-                                  <>
-                                    <button
-                                      className="btn btn-success btn-sm"
-                                      onClick={() => handleReleasePayment(jobId)}
-                                      disabled={pendingJobId === jobId}
-                                    >
-                                      Approve & Settle
-                                    </button>
-                                    <button
-                                      className="btn btn-secondary btn-sm"
-                                      style={{ border: '1px solid var(--ph-red)', color: 'var(--ph-red)' }}
-                                      onClick={() => handleDispute(jobId)}
-                                      disabled={pendingJobId === jobId}
-                                    >
-                                      Dispute
-                                    </button>
-                                  </>
-                                )}
+                                  {job.status === 1 && address && job.client.toLowerCase() === address.toLowerCase() && ( // FUNDED & CLIENT
+                                    <>
+                                      <button
+                                        className="btn btn-success btn-sm"
+                                        onClick={() => handleReleasePayment(jobId, paymentFormatted, job.contractor)}
+                                        disabled={pendingJobId === jobId}
+                                      >
+                                        Release
+                                      </button>
+                                      <button
+                                        className="btn btn-red btn-sm"
+                                        onClick={() => handleDispute(jobId)}
+                                        disabled={pendingJobId === jobId}
+                                      >
+                                        Dispute
+                                      </button>
+                                    </>
+                                  )}
                                 {job.status === 2 && (
                                   <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Payout Released</span>
                                 )}
@@ -501,42 +665,25 @@ export default function PayrollPage() {
           </div>
 
           {/* Create Agreement Modal */}
-          <AnimatePresence>
-            {showCreateModal && (
-              <div style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'rgba(0,0,0,0.8)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1000,
-                padding: 16
-              }}>
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="card" 
-                  style={{ width: '100%', maxWidth: '480px', border: '3px solid var(--text-primary)', boxShadow: '8px 8px 0px rgba(0,0,0,0.95)' }}
-                >
-                  <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid var(--text-primary)' }}>
-                    <span className="card-title">Establish Escrow Payroll</span>
-                    <button 
-                      className="btn btn-secondary" 
-                      style={{ padding: 4 }} 
-                      onClick={() => setShowCreateModal(false)}
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                  <div className="card-body" style={{ padding: 20 }}>
+          <ModalPortal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)}>
+            <ModalOverlay onClose={() => setShowCreateModal(false)}>
+              <Modal type="confirm" onClose={() => setShowCreateModal(false)} maxWidth="480px">
+                <div style={{ padding: '24px' }}>
+                  <ModalHeader>
+                    <ModalIcon type="confirm" />
+                    <div>
+                      <span className="badge badge-purple" style={{ fontSize: '9px', marginBottom: 4, letterSpacing: '0.04em' }}>
+                        ERC-8183 PROTOCOL
+                      </span>
+                      <h3 style={{ fontSize: 16, fontWeight: 800, textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+                        Establish Escrow Payroll
+                      </h3>
+                    </div>
+                  </ModalHeader>
+                  <ModalBody>
                     <form onSubmit={handleCreateJob} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>
                           Contractor Wallet Address
                         </label>
                         <input
@@ -551,7 +698,7 @@ export default function PayrollPage() {
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>
                           Payroll Payout Amount (USDC)
                         </label>
                         <input
@@ -568,7 +715,6 @@ export default function PayrollPage() {
                       <div style={{
                         background: 'var(--bg-elevated)',
                         padding: '12px',
-                        borderRadius: 'var(--radius-sm)',
                         fontSize: 11,
                         lineHeight: 1.4,
                         color: 'var(--text-secondary)',
@@ -577,20 +723,22 @@ export default function PayrollPage() {
                         <strong>Note:</strong> Creating this agreement initializes the escrow contract. You will need to explicitly fund the escrow in the next step to lock the payout funds.
                       </div>
 
-                      <button
+                      <LoadingButton
                         type="submit"
-                        className="btn btn-primary"
+                        variant="primary"
+                        isLoading={isSubmitting}
+                        loadingText="Establishing Escrow..."
                         style={{ width: '100%', padding: '12px' }}
-                        disabled={isSubmitting}
                       >
                         Submit Agreement
-                      </button>
+                      </LoadingButton>
                     </form>
-                  </div>
-                </motion.div>
-              </div>
-            )}
-          </AnimatePresence>
+                  </ModalBody>
+                </div>
+              </Modal>
+            </ModalOverlay>
+          </ModalPortal>
+          <RelatedContent />
         </div>
       </main>
     </div>

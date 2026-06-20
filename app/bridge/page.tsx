@@ -2,6 +2,7 @@
 
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
+import RelatedContent from '@/components/ui/RelatedContent';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSwitchChain, useConnectorClient, useSignTypedData } from 'wagmi';
 import { useAccount, useWriteContract } from '@/hooks/useOnChainData';
@@ -10,6 +11,7 @@ import { WalletEmptyState } from '@/components/ui/WalletEmptyState';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import { useModal } from '@/context/ModalContext';
 import { createAdapterFromProvider } from "@circle-fin/adapter-viem-v2";
 import { BridgeKit, EthereumSepolia, BaseSepolia, ArbitrumSepolia, ArcTestnet } from "@circle-fin/bridge-kit";
 import { createPublicClient, http, parseUnits, formatUnits, keccak256, parseEventLogs } from 'viem';
@@ -58,6 +60,7 @@ export default function BridgePage() {
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
   const { data: connectorClient } = useConnectorClient();
+  const { triggerGlobalError, openModal } = useModal();
 
   // Bridge States
   const [sourceChain, setSourceChain] = useState('sepolia');
@@ -405,7 +408,7 @@ export default function BridgePage() {
     } catch (error: any) {
       console.error(error);
       addLog(`❌ ERROR: ${error.message || error}`);
-      toast.error(`Bridge failed: ${error.message || error}`);
+      triggerGlobalError(error);
       setBridgeStep('input');
     }
   };
@@ -690,7 +693,7 @@ export default function BridgePage() {
     } catch (error: any) {
       console.error(error);
       addSwapLog(`❌ ERROR: ${error.message || error}`);
-      toast.error(`Swap failed: ${error.message || error}`);
+      triggerGlobalError(error);
       setSwapStep('input');
     } finally {
       setIsSwapping(false);
@@ -710,7 +713,7 @@ export default function BridgePage() {
   return (
     <div className="app-layout">
       <Sidebar />
-      <main className="app-main">
+      <main className="app-main" id="main-content">
         <Topbar title="Bridge & Swap" />
         <div className="app-content">
           {!isConnected ? (
@@ -1235,6 +1238,7 @@ export default function BridgePage() {
               </div>
             </motion.div>
           )}
+          <RelatedContent />
         </div>
       </main>
     </div>

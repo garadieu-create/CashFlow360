@@ -4,6 +4,8 @@ import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, ExternalLink, Settings, ShieldAlert, Sparkles, X, Check, Server } from 'lucide-react';
+import { LoadingButton } from '@/components/ui/LoadingSystem';
+import RelatedContent from '@/components/ui/RelatedContent';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { ApiCredentials } from '@/components/dashboard/ApiCredentials';
@@ -133,7 +135,7 @@ export default function IntegrationsPage() {
   return (
     <div className="app-layout">
       <Sidebar />
-      <main className="app-main">
+      <main className="app-main" id="main-content">
         <Topbar title="Integrations" />
         <div className="app-content">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -262,6 +264,7 @@ export default function IntegrationsPage() {
               </div>
             </motion.div>
           </motion.div>
+          <RelatedContent />
         </div>
       </main>
 
@@ -342,7 +345,7 @@ export default function IntegrationsPage() {
                     fontSize: 13,
                     color: 'var(--ph-yellow)'
                   }}>
-                    <div className="spinner" />
+                    <div className="premium-spinner" style={{ width: 14, height: 14 }} />
                     Connecting to Circle Dev Platform...
                   </div>
                 ) : (
@@ -372,14 +375,15 @@ export default function IntegrationsPage() {
                   >
                     Cancel
                   </button>
-                  <button 
+                  <LoadingButton 
                     type="submit" 
-                    className="btn btn-primary" 
+                    variant="primary" 
+                    isLoading={isVerifying}
+                    loadingText="Connecting..."
                     style={{ flex: 1 }}
-                    disabled={isVerifying}
                   >
                     Save & Connect
-                  </button>
+                  </LoadingButton>
                 </div>
               </form>
             </motion.div>

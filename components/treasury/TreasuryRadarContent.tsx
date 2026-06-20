@@ -29,7 +29,7 @@ interface ChainBalance {
 function useMultiChainBalances() {
   const { address } = useAccount();
 
-  const { formatted: arcBalance } = useUSDCBalance();
+  const { formatted: arcBalance, isDemo } = useUSDCBalance();
 
   const { data: sepoliaBalance } = useReadContract({
     address: TESTNET_USDC[sepolia.id],
@@ -37,7 +37,7 @@ function useMultiChainBalances() {
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     chainId: sepolia.id,
-    query: { enabled: !!address, refetchInterval: 15000 },
+    query: { enabled: !!address && !isDemo, refetchInterval: 15000 },
   });
 
   const { data: baseBalance } = useReadContract({
@@ -46,7 +46,7 @@ function useMultiChainBalances() {
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     chainId: baseSepolia.id,
-    query: { enabled: !!address, refetchInterval: 15000 },
+    query: { enabled: !!address && !isDemo, refetchInterval: 15000 },
   });
 
   const { data: arbBalance } = useReadContract({
@@ -55,7 +55,7 @@ function useMultiChainBalances() {
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     chainId: arbitrumSepolia.id,
-    query: { enabled: !!address, refetchInterval: 15000 },
+    query: { enabled: !!address && !isDemo, refetchInterval: 15000 },
   });
 
   const chains: ChainBalance[] = [
@@ -63,7 +63,7 @@ function useMultiChainBalances() {
       chainId: arcTestnet.id,
       chainName: 'Arc Testnet',
       symbol: 'ARC',
-      balance: arcBalance,
+      balance: isDemo ? '14250.00' : arcBalance,
       color: '#F54E00',
       angle: 0,
     },
@@ -71,7 +71,7 @@ function useMultiChainBalances() {
       chainId: sepolia.id,
       chainName: 'Ethereum Sepolia',
       symbol: 'ETH',
-      balance: sepoliaBalance ? formatUnits(sepoliaBalance as bigint, 6) : '0.00',
+      balance: isDemo ? '5420.00' : (sepoliaBalance ? formatUnits(sepoliaBalance as bigint, 6) : '0.00'),
       color: '#627EEA',
       angle: 90,
     },
@@ -79,7 +79,7 @@ function useMultiChainBalances() {
       chainId: baseSepolia.id,
       chainName: 'Base Sepolia',
       symbol: 'BASE',
-      balance: baseBalance ? formatUnits(baseBalance as bigint, 6) : '0.00',
+      balance: isDemo ? '8900.00' : (baseBalance ? formatUnits(baseBalance as bigint, 6) : '0.00'),
       color: '#0052FF',
       angle: 180,
     },
@@ -87,7 +87,7 @@ function useMultiChainBalances() {
       chainId: arbitrumSepolia.id,
       chainName: 'Arbitrum Sepolia',
       symbol: 'ARB',
-      balance: arbBalance ? formatUnits(arbBalance as bigint, 6) : '0.00',
+      balance: isDemo ? '12150.00' : (arbBalance ? formatUnits(arbBalance as bigint, 6) : '0.00'),
       color: '#28A0F0',
       angle: 270,
     },
@@ -95,12 +95,12 @@ function useMultiChainBalances() {
 
   const totalBalance = chains.reduce((sum, c) => sum + parseFloat(c.balance), 0);
 
-  return { chains, totalBalance };
+  return { chains, totalBalance, isDemo };
 }
 
 export default function TreasuryRadarContent() {
   const { isConnected } = useAccount();
-  const { chains, totalBalance } = useMultiChainBalances();
+  const { chains, totalBalance, isDemo } = useMultiChainBalances();
 
   if (!isConnected) {
     return (
@@ -132,6 +132,31 @@ export default function TreasuryRadarContent() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      {isDemo && (
+        <div style={{
+          background: 'rgba(59, 130, 246, 0.05)',
+          border: '2px dashed #3B82F6',
+          padding: '16px 20px',
+          marginBottom: '24px',
+          color: 'var(--text-primary)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 16,
+          boxShadow: '4px 4px 0px rgba(0,0,0,0.9)',
+          fontFamily: 'var(--font-mono)'
+        }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#3B82F6', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>ℹ️</span> SANDBOX DEMO MODE ACTIVE
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.4 }}>
+              Showing simulated unified treasury balances across chains. To display your live balances, receive USDC on your connected wallet address on any of these testnets.
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="page-header">
         <div>
           <h1 className="page-title">Cross-Chain Treasury Radar</h1>
@@ -179,7 +204,7 @@ export default function TreasuryRadarContent() {
             <span className="badge badge-green">Live</span>
           </div>
           <div className="card-body" style={{ display: 'flex', justifyContent: 'center' }}>
-            <svg width={500} height={500} viewBox="0 0 500 500" style={{ maxWidth: '100%' }}>
+            <svg viewBox="0 0 500 500" style={{ width: '100%', height: 'auto', maxHeight: '500px' }}>
               {/* Radar rings */}
               {[0.33, 0.66, 1].map((scale, i) => (
                 <circle

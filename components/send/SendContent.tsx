@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits } from 'viem';
 import { USDC_ADDRESS, getExplorerTxUrl } from '@/lib/arc-config';
@@ -9,6 +9,8 @@ import { motion } from 'framer-motion';
 import { Send, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import { useModal } from '@/context/ModalContext';
+import { LoadingButton } from '@/components/ui/LoadingSystem';
 
 function parseError(error: any): string {
   if (!error) return '';
@@ -32,10 +34,116 @@ export default function SendContent() {
   const { transfer, data: txHash, isPending, error, reset } = useVaultOperations();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
+  const { openModal, updateModal, closeModal, triggerGlobalError } = useModal();
+  const modalIdRef = useRef<string | null>(null);
+
   const refetch = () => {
     refetchUSDC();
     refetchVault();
   };
+
+  useEffect(() => {
+    // 1. Awaiting Wallet Signature
+    if (isPending) {
+      if (!modalIdRef.current) {
+        const id = openModal({
+          type: 'transaction',
+          title: 'Authorize Treasury Transfer',
+          description: `Please authorize the payment of ${amount} USDC to ${recipient.slice(0, 6)}...${recipient.slice(-4)} in your wallet.`,
+          badge: 'Wallet Request',
+          txStatus: 'pending',
+          txSteps: [
+            { label: 'Awaiting signature in wallet', status: 'pending' },
+            { label: 'Blockchain confirmation', status: 'idle' }
+          ],
+          isDismissable: false
+        });
+        modalIdRef.current = id;
+      } else {
+        updateModal(modalIdRef.current, {
+          txStatus: 'pending',
+          txSteps: [
+            { label: 'Awaiting signature in wallet', status: 'pending' },
+            { label: 'Blockchain confirmation', status: 'idle' }
+          ]
+        });
+      }
+    }
+
+    // 2. Waiting for Block Confirmation
+    if (isConfirming && txHash) {
+      if (!modalIdRef.current) {
+        const id = openModal({
+          type: 'transaction',
+          title: 'Transfer Broadcasting',
+          description: `Broadcasting payment of ${amount} USDC on Arc Testnet.`,
+          badge: 'On-Chain Execution',
+          txStatus: 'confirming',
+          txHash,
+          explorerUrl: getExplorerTxUrl(txHash),
+          txSteps: [
+            { label: 'Awaiting signature in wallet', status: 'success' },
+            { label: 'Blockchain confirmation', status: 'pending' }
+          ],
+          isDismissable: false
+        });
+        modalIdRef.current = id;
+      } else {
+        updateModal(modalIdRef.current, {
+          txStatus: 'confirming',
+          txHash,
+          explorerUrl: getExplorerTxUrl(txHash),
+          txSteps: [
+            { label: 'Awaiting signature in wallet', status: 'success' },
+            { label: 'Blockchain confirmation', status: 'pending' }
+          ]
+        });
+      }
+    }
+
+    // 3. Success state
+    if (isSuccess && txHash) {
+      if (modalIdRef.current) {
+        updateModal(modalIdRef.current, {
+          type: 'success',
+          txStatus: 'success',
+          title: 'Transfer Settled Successfully',
+          description: `Successfully sent ${amount} USDC to ${recipient.slice(0, 6)}...${recipient.slice(-4)} with sub-second EVM finality on Arc Testnet.`,
+          badge: 'Payment Cleared',
+          txSteps: [
+            { label: 'Awaiting signature in wallet', status: 'success' },
+            { label: 'Blockchain confirmation', status: 'success' }
+          ],
+          isDismissable: true,
+          buttons: [
+            {
+              label: 'Done',
+              variant: 'secondary',
+              closeModalAfterClick: true,
+              onClick: () => {
+                setAmount('');
+                setRecipient('');
+                reset();
+                modalIdRef.current = null;
+              }
+            }
+          ]
+        });
+      }
+    }
+
+    // 4. Error State
+    if (error) {
+      if (modalIdRef.current) {
+        closeModal(modalIdRef.current);
+        modalIdRef.current = null;
+      }
+      triggerGlobalError(error, () => {
+        transfer(recipient, parseUnits(amount, 6), category);
+      });
+      reset();
+    }
+  }, [isPending, isConfirming, isSuccess, error, txHash]);
 
   if (!isConnected) {
     return (
@@ -78,12 +186,32 @@ export default function SendContent() {
       return;
     }
 
-    try {
-      transfer(recipient, parseUnits(amount, 6), category);
-      toast.loading('Transaction submitted...');
-    } catch (err) {
-      toast.error('Transaction failed');
-    }
+    // Open Confirmation modal before executing transaction
+    openModal({
+      type: 'confirm',
+      title: 'Confirm Outflow Transfer',
+      description: `You are about to transfer ${parseFloat(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} USDC from your treasury vault to recipient ${recipient}. This will immediately lock and transfer the funds.`,
+      badge: 'Security Verification',
+      buttons: [
+        {
+          label: 'Cancel',
+          variant: 'secondary',
+          closeModalAfterClick: true
+        },
+        {
+          label: 'Confirm & Sign',
+          variant: 'primary',
+          closeModalAfterClick: true,
+          onClick: () => {
+            try {
+              transfer(recipient, parseUnits(amount, 6), category);
+            } catch (err) {
+              triggerGlobalError(err);
+            }
+          }
+        }
+      ]
+    });
   };
 
   if (isSuccess && txHash) {
@@ -138,6 +266,7 @@ export default function SendContent() {
                 <input
                   type="number"
                   className="input input-mono"
+                  style={{ paddingRight: '68px' }}
                   placeholder="0.00"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
@@ -199,21 +328,17 @@ export default function SendContent() {
               </div>
             </div>
 
-            {/* Submit */}
-            <button
-              className="btn btn-primary btn-lg"
+            <LoadingButton
+              variant="primary"
+              size="lg"
               onClick={handleSend}
-              disabled={isPending || isConfirming || !recipient || !amount}
+              isLoading={isPending || isConfirming}
+              loadingText={isPending ? 'Confirming in wallet...' : 'Waiting for confirmation...'}
+              disabled={!recipient || !amount}
               style={{ width: '100%' }}
             >
-              {isPending ? (
-                <><div className="spinner" style={{ width: 16, height: 16 }} /> Confirming in wallet...</>
-              ) : isConfirming ? (
-                <><div className="spinner" style={{ width: 16, height: 16 }} /> Waiting for confirmation...</>
-              ) : (
-                <><Send size={16} /> Send USDC</>
-              )}
-            </button>
+              <Send size={16} /> Send USDC
+            </LoadingButton>
 
             {/* Success State */}
             {isSuccess && txHash && (

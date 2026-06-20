@@ -2,6 +2,7 @@
 
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
+import RelatedContent from '@/components/ui/RelatedContent';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Bell, 
@@ -22,6 +23,7 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useVaultAlerts, useAccount } from '@/hooks/useOnChainData';
 import { parseUnits } from 'viem';
+import { LoadingButton, Skeleton } from '@/components/ui/LoadingSystem';
 
 interface AlertRule {
   id: number;
@@ -200,7 +202,7 @@ export default function AlertsPage() {
   return (
     <div className="app-layout">
       <Sidebar />
-      <main className="app-main">
+      <main className="app-main" id="main-content">
         <Topbar title="Alerts" />
         <div className="app-content">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -245,7 +247,13 @@ export default function AlertsPage() {
                             {rule.type}
                           </span>
                         </td>
-                        <td className="cell-mono">{rule.condition}</td>
+                        <td className="cell-mono">
+                          {rule.type === 'Low Balance' && loadingThreshold ? (
+                            <Skeleton width="180px" height="14px" />
+                          ) : (
+                            rule.condition
+                          )}
+                        </td>
                         <td>
                           <span className={`badge ${
                             rule.severity === 'critical' ? 'badge-red' :
@@ -292,6 +300,7 @@ export default function AlertsPage() {
               </div>
             </motion.div>
           </motion.div>
+          <RelatedContent />
         </div>
       </main>
 
@@ -380,9 +389,15 @@ export default function AlertsPage() {
                   <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setIsCreateOpen(false)} disabled={isSubmitting}>
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={isSubmitting}>
-                    {isSubmitting ? 'Confirming...' : 'Create Rule'}
-                  </button>
+                  <LoadingButton
+                    type="submit"
+                    variant="primary"
+                    isLoading={isSubmitting}
+                    loadingText="Confirming..."
+                    style={{ flex: 1 }}
+                  >
+                    Create Rule
+                  </LoadingButton>
                 </div>
               </form>
             </motion.div>
@@ -475,9 +490,15 @@ export default function AlertsPage() {
                   <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setIsEditOpen(false)} disabled={isSubmitting}>
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={isSubmitting}>
-                    {isSubmitting ? 'Saving...' : 'Save Changes'}
-                  </button>
+                  <LoadingButton
+                    type="submit"
+                    variant="primary"
+                    isLoading={isSubmitting}
+                    loadingText="Saving..."
+                    style={{ flex: 1 }}
+                  >
+                    Save Changes
+                  </LoadingButton>
                 </div>
               </form>
             </motion.div>

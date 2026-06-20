@@ -3,6 +3,7 @@
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
 import { useState, useEffect } from 'react';
+import RelatedContent from '@/components/ui/RelatedContent';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, 
@@ -110,7 +111,7 @@ export default function MarketplacePage() {
   return (
     <div className="app-layout">
       <Sidebar />
-      <main className="app-main">
+      <main className="app-main" id="main-content">
         <Topbar title="x402 Marketplace" />
         <div className="app-content">
 
@@ -147,7 +148,7 @@ export default function MarketplacePage() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '24px' }}>
+          <div className="marketplace-grid">
             
             {/* Left side: Protected Endpoints */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -314,7 +315,7 @@ export default function MarketplacePage() {
             </div>
 
           </div>
-
+          <RelatedContent />
         </div>
       </main>
     </div>

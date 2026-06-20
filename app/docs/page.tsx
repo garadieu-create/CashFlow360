@@ -4,12 +4,13 @@ import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
 import { motion } from 'framer-motion';
 import { ExternalLink, FileText, Github, Video, Code } from 'lucide-react';
+import RelatedContent from '@/components/ui/RelatedContent';
 
 export default function DocsPage() {
   return (
     <div className="app-layout">
       <Sidebar />
-      <main className="app-main">
+      <main className="app-main" id="main-content">
         <Topbar title="Documentation" />
         <div className="app-content">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ maxWidth: 800 }}>
@@ -125,6 +126,7 @@ export default function DocsPage() {
               </div>
             </motion.div>
           </motion.div>
+          <RelatedContent />
         </div>
       </main>
     </div>

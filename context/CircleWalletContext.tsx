@@ -35,6 +35,8 @@ interface CircleWalletContextType {
   ) => Promise<`0x${string}`>;
   isLastTxSponsored: boolean;
   gasSponsoredCount: number;
+  showOverlay: boolean;
+  setShowOverlay: (show: boolean) => void;
 }
 
 const CircleWalletContext = createContext<CircleWalletContextType | undefined>(undefined);
@@ -346,7 +348,9 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
         logout,
         executeContractWrite,
         isLastTxSponsored,
-        gasSponsoredCount
+        gasSponsoredCount,
+        showOverlay,
+        setShowOverlay
       }}
     >
       {children}
@@ -564,9 +568,41 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
               </div>
             )}
 
+            {/* Explore as Guest Option */}
+            <button
+              onClick={() => setShowOverlay(false)}
+              style={{
+                marginTop: 16,
+                width: '100%',
+                background: 'transparent',
+                border: '1px dashed rgba(255,255,255,0.15)',
+                color: 'var(--text-secondary)',
+                height: 40,
+                borderRadius: 10,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#F54E00';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+                e.currentTarget.style.color = 'var(--text-secondary)';
+              }}
+            >
+              Explore Platform (Guest Mode)
+            </button>
+
             {/* Network Banner */}
             <div style={{
-              marginTop: 28,
+              marginTop: 20,
               padding: 12,
               background: '#0D0F14',
               borderRadius: 10,

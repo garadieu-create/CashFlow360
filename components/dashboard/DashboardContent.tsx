@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Activity, DollarSign, RefreshCw } from 'lucide-react';
 import CashFlowChart from './CashFlowChart';
 import TransactionTable from './TransactionTable';
-import { WalletEmptyState } from '@/components/ui/WalletEmptyState';
+import LandingPage from './LandingPage';
 import { StatGrid } from './StatGrid';
 import { MultiBalanceBar } from './MultiBalanceBar';
 import { OnboardingTour } from '@/components/ui/OnboardingTour';
@@ -31,26 +31,7 @@ export default function DashboardContent() {
   const metrics = useCashFlowMetrics(transactions);
 
   if (!isConnected) {
-    return (
-      <WalletEmptyState
-        title="Connect Your Wallet"
-        description="Connect your wallet to see real-time cash flow analytics from the Arc blockchain. All data is sourced directly from on-chain events — no mock data."
-        svgIcon={
-          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="8" y="32" width="12" height="24" rx="2" fill="url(#dash_grad)" />
-            <rect x="26" y="16" width="12" height="40" rx="2" fill="url(#dash_grad)" />
-            <rect x="44" y="24" width="12" height="32" rx="2" fill="url(#dash_grad)" />
-            <path d="M4 56H60" stroke="var(--border-primary)" strokeWidth="4" strokeLinecap="round" />
-            <defs>
-              <linearGradient id="dash_grad" x1="8" y1="16" x2="56" y2="56" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#F54E00" />
-                <stop offset="1" stopColor="#FF7A33" />
-              </linearGradient>
-            </defs>
-          </svg>
-        }
-      />
-    );
+    return <LandingPage />;
   }
 
   const handleRefresh = () => {

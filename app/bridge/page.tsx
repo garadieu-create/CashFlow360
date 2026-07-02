@@ -8,6 +8,7 @@ import { useSwitchChain, useConnectorClient, useSignTypedData } from 'wagmi';
 import { useAccount, useWriteContract } from '@/hooks/useOnChainData';
 import { ArrowUpDown, ExternalLink, Info, Shield, CheckCircle2, AlertCircle, RefreshCw, Layers, Zap } from 'lucide-react';
 import { WalletEmptyState } from '@/components/ui/WalletEmptyState';
+import { TokenOrChainIcon } from '@/components/ui/USDCIcon';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
@@ -56,7 +57,7 @@ const SOURCE_CHAINS: Record<string, {
 };
 
 export default function BridgePage() {
-  const { isConnected, address } = useAccount();
+  const { isConnected, address, isConnecting } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
   const { data: connectorClient } = useConnectorClient();
@@ -716,7 +717,12 @@ export default function BridgePage() {
       <main className="app-main" id="main-content">
         <Topbar title="Bridge & Swap" />
         <div className="app-content">
-          {!isConnected ? (
+          {isConnecting ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '16px' }}>
+              <div className="spinner" style={{ width: '32px', height: '32px' }} />
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>Restoring secure session...</span>
+            </div>
+          ) : !isConnected ? (
             <WalletEmptyState
               title="Connect Wallet"
               description="Bridge USDC across chains using Circle CCTP."
@@ -769,33 +775,58 @@ export default function BridgePage() {
                         </div>
 
                         <div className="input-group" style={{ marginBottom: 'var(--space-lg)' }}>
-                          <label className="input-label">From Chain</label>
-                          <select 
-                            className="input" 
-                            value={sourceChain} 
-                            onChange={(e) => setSourceChain(e.target.value)}
-                          >
-                            <option value="sepolia">Ethereum Sepolia</option>
-                            <option value="base">Base Sepolia</option>
-                            <option value="arbitrum">Arbitrum Sepolia</option>
-                          </select>
+                          <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                            From Chain
+                            <span className="tooltip-container">
+                              <span className="tooltip-trigger">?</span>
+                              <span className="tooltip-content">
+                                The origin network where your source USDC resides. Bridges via Cross-Chain Transfer Protocol (CCTP).
+                              </span>
+                            </span>
+                          </label>
+                          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <div style={{ position: 'absolute', left: 12, pointerEvents: 'none' }}>
+                              <TokenOrChainIcon name={sourceChain} size={18} />
+                            </div>
+                            <select 
+                              id="bridge-source-chain-select"
+                              className="input" 
+                              value={sourceChain} 
+                              onChange={(e) => setSourceChain(e.target.value)}
+                              style={{ paddingLeft: 38 }}
+                            >
+                              <option value="sepolia">Ethereum Sepolia</option>
+                              <option value="base">Base Sepolia</option>
+                              <option value="arbitrum">Arbitrum Sepolia</option>
+                            </select>
+                          </div>
                         </div>
 
                         <div style={{ textAlign: 'center', padding: 'var(--space-xs)', color: 'var(--text-tertiary)' }}>↓</div>
 
                         <div className="input-group" style={{ marginBottom: 'var(--space-lg)' }}>
                           <label className="input-label">To Chain</label>
-                          <div className="input" style={{ background: 'var(--ph-red-light)', borderColor: 'var(--ph-red)', color: 'var(--text-primary)', fontWeight: 600 }}>
+                          <div className="input" style={{ background: 'var(--ph-red-light)', borderColor: 'var(--ph-red)', color: 'var(--text-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <TokenOrChainIcon name="arc" size={18} />
                             Arc Testnet (Primary Hub)
                           </div>
                         </div>
 
                         <div className="input-group" style={{ marginBottom: 'var(--space-xl)' }}>
-                          <label className="input-label">Amount (USDC)</label>
+                          <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                            Amount (USDC)
+                            <span className="tooltip-container">
+                              <span className="tooltip-trigger">?</span>
+                              <span className="tooltip-content">
+                                The quantity of USDC to bridge. Safe limits depend on your source chain account balance.
+                              </span>
+                            </span>
+                          </label>
                           <input 
+                            id="bridge-amount-input"
                             type="number" 
                             className="input input-mono" 
-                            placeholder="0.00" 
+                            placeholder="0.00 (e.g. 500.00)" 
                             step="100"
                             value={bridgeAmount}
                             onChange={(e) => setBridgeAmount(e.target.value)}
@@ -828,6 +859,7 @@ export default function BridgePage() {
                         )}
 
                         <button 
+                          id="bridge-start-btn"
                           className="btn btn-primary btn-lg" 
                           style={{ width: '100%' }}
                           onClick={handleStartBridge}
@@ -858,39 +890,88 @@ export default function BridgePage() {
                           </div>
                         </div>
 
-                        {/* Progress Steps Indicators */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-xl)', background: 'var(--bg-elevated)', padding: 12, borderRadius: 8 }}>
-                          {['Approve', 'Burn', 'Attest', 'Mint'].map((stepName, idx) => {
+                        {/* Premium Vertical Steps Indicators */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 'var(--space-xl)', background: 'var(--bg-elevated)', padding: 18, borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+                          {[
+                            { name: 'Approve Transfer', desc: 'Allows Circle CCTP to move USDC from your wallet.', est: '~5s', key: 'approve' },
+                            { name: 'CCTP Burn', desc: 'Locks and burns your USDC on the source chain.', est: '~10s', key: 'burn' },
+                            { name: 'Circle Attestation', desc: 'Circle API generates verified consensus signature.', est: '~15s', key: 'attest' },
+                            { name: 'Mint on Arc', desc: 'Claims and mints native USDC to your smart wallet on Arc.', est: '~5s', key: 'mint' },
+                          ].map((stepItem, idx) => {
                             const stepKeys = ['approve', 'burn', 'attest', 'mint'];
                             const currentIdx = stepKeys.indexOf(bridgeStep);
-                            const stepKey = stepKeys[idx];
                             const isCompleted = bridgeStep === 'success' || currentIdx > idx;
-                            const isActive = bridgeStep === stepKey;
+                            const isActive = bridgeStep === stepItem.key;
 
                             return (
-                              <div key={stepName} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: 4 }}>
-                                <div style={{ 
-                                  width: 18, 
-                                  height: 18, 
-                                  borderRadius: '50%', 
-                                  background: isCompleted ? 'var(--ph-green)' : isActive ? 'var(--ph-red)' : 'var(--bg-surface)',
-                                  border: `2px solid ${isActive ? 'var(--ph-red)' : 'var(--border-primary)'}`,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: 9,
-                                  fontWeight: 800,
-                                  color: isCompleted || isActive ? 'white' : 'var(--text-tertiary)'
-                                }}>
-                                  {isCompleted ? '✓' : idx + 1}
+                              <div key={stepItem.name} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', opacity: isCompleted || isActive ? 1 : 0.4 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                  <div style={{ 
+                                    width: 24, 
+                                    height: 24, 
+                                    borderRadius: '50%', 
+                                    background: isCompleted ? 'var(--ph-green)' : isActive ? 'var(--ph-red)' : 'var(--bg-surface)',
+                                    border: `2px solid ${isActive ? 'var(--ph-red)' : 'var(--border-primary)'}`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    color: isCompleted || isActive ? 'white' : 'var(--text-tertiary)'
+                                  }}>
+                                    {isCompleted ? '✓' : idx + 1}
+                                  </div>
+                                  {idx < 3 && (
+                                    <div style={{
+                                      width: 2,
+                                      height: 24,
+                                      background: isCompleted ? 'var(--ph-green)' : 'rgba(255,255,255,0.06)',
+                                      marginTop: 4
+                                    }} />
+                                  )}
                                 </div>
-                                <span style={{ fontSize: 10, fontWeight: 600, color: isCompleted || isActive ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
-                                  {stepName}
-                                </span>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+                                      {stepItem.name}
+                                    </span>
+                                    <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                                      {stepItem.est}
+                                    </span>
+                                  </div>
+                                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                                    {stepItem.desc}
+                                  </div>
+                                </div>
                               </div>
                             );
                           })}
                         </div>
+
+                        {/* Onchain Recovery Safety Warning */}
+                        {bridgeStep !== 'success' && (
+                          <div style={{
+                            padding: '12px 14px',
+                            background: 'rgba(29, 74, 255, 0.05)',
+                            border: '1px solid rgba(29, 74, 255, 0.15)',
+                            borderRadius: 'var(--radius-md)',
+                            fontSize: 11,
+                            color: 'var(--text-secondary)',
+                            marginBottom: 'var(--space-md)',
+                            display: 'flex',
+                            gap: 8
+                          }}>
+                            <Info size={16} color="var(--ph-blue)" style={{ flexShrink: 0, marginTop: 1 }} />
+                            <div>
+                              <strong style={{ color: 'var(--text-primary)' }}>Safe & Recoverable:</strong> Your funds are secured on-chain via smart contracts. You can safely close or refresh this tab; your CCTP attestation state is permanent.
+                              {bridgeTxHash && (
+                                <div style={{ marginTop: 6, fontSize: 10, fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>
+                                  Burn Tx: <span style={{ color: 'var(--text-primary)' }}>{bridgeTxHash}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Live Logs Terminal */}
                         <div style={{ 
@@ -900,7 +981,7 @@ export default function BridgePage() {
                           padding: 'var(--space-md)',
                           fontFamily: 'var(--font-mono)',
                           fontSize: 11,
-                          height: 180,
+                          height: 120,
                           overflowY: 'auto',
                           marginBottom: 'var(--space-lg)',
                           color: '#A7F3D0',
@@ -990,37 +1071,76 @@ export default function BridgePage() {
                         </div>
 
                         <div className="input-group" style={{ marginBottom: 'var(--space-lg)' }}>
-                          <label className="input-label">From Token</label>
-                          <select 
-                            className="input input-mono" 
-                            value={fromToken} 
-                            onChange={(e) => handleTokenSelectChange('from', e.target.value)}
-                          >
-                            <option value="usdc">USDC (USD Coin)</option>
-                            <option value="eurc">EURC (Euro Coin)</option>
-                          </select>
+                          <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                            From Token
+                            <span className="tooltip-container">
+                              <span className="tooltip-trigger">?</span>
+                              <span className="tooltip-content">
+                                The stablecoin asset you want to swap from your balance.
+                              </span>
+                            </span>
+                          </label>
+                          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <div style={{ position: 'absolute', left: 12, pointerEvents: 'none' }}>
+                              <TokenOrChainIcon name={fromToken} size={18} />
+                            </div>
+                            <select 
+                              id="swap-from-token-select"
+                              className="input input-mono" 
+                              value={fromToken} 
+                              onChange={(e) => handleTokenSelectChange('from', e.target.value)}
+                              style={{ paddingLeft: 38 }}
+                            >
+                              <option value="usdc">USDC (USD Coin)</option>
+                              <option value="eurc">EURC (Euro Coin)</option>
+                            </select>
+                          </div>
                         </div>
 
                         <div style={{ textAlign: 'center', padding: 'var(--space-xs)', color: 'var(--text-tertiary)' }}>⇄</div>
 
                         <div className="input-group" style={{ marginBottom: 'var(--space-lg)' }}>
-                          <label className="input-label">To Token</label>
-                          <select 
-                            className="input input-mono" 
-                            value={toToken} 
-                            onChange={(e) => handleTokenSelectChange('to', e.target.value)}
-                          >
-                            <option value="usdc">USDC (USD Coin)</option>
-                            <option value="eurc">EURC (Euro Coin)</option>
-                          </select>
+                          <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                            To Token
+                            <span className="tooltip-container">
+                              <span className="tooltip-trigger">?</span>
+                              <span className="tooltip-content">
+                                The stablecoin asset you want to receive into your balance.
+                              </span>
+                            </span>
+                          </label>
+                          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <div style={{ position: 'absolute', left: 12, pointerEvents: 'none' }}>
+                              <TokenOrChainIcon name={toToken} size={18} />
+                            </div>
+                            <select 
+                              id="swap-to-token-select"
+                              className="input input-mono" 
+                              value={toToken} 
+                              onChange={(e) => handleTokenSelectChange('to', e.target.value)}
+                              style={{ paddingLeft: 38 }}
+                            >
+                              <option value="usdc">USDC (USD Coin)</option>
+                              <option value="eurc">EURC (Euro Coin)</option>
+                            </select>
+                          </div>
                         </div>
 
                         <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
-                          <label className="input-label">Amount</label>
+                          <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                            Amount
+                            <span className="tooltip-container">
+                              <span className="tooltip-trigger">?</span>
+                              <span className="tooltip-content">
+                                The quantity of source token to swap. Subject to active liquidity pricing.
+                              </span>
+                            </span>
+                          </label>
                           <input 
+                            id="swap-amount-input"
                             type="number" 
                             className="input input-mono" 
-                            placeholder="0.00" 
+                            placeholder="0.00 (e.g. 100.00)" 
                             step="10"
                             value={swapAmount}
                             onChange={(e) => setSwapAmount(e.target.value)}
@@ -1046,6 +1166,7 @@ export default function BridgePage() {
                         )}
 
                         <button 
+                          id="swap-start-btn"
                           className="btn btn-secondary btn-lg" 
                           style={{ width: '100%', borderColor: 'var(--ph-purple)', color: 'var(--text-primary)' }}
                           onClick={handleSwap}

@@ -23,13 +23,22 @@ function formatUSD(val: number): string {
 }
 
 export default function DashboardContent() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, isConnecting } = useAccount();
   const { formatted: usdcBalance, isLoading: loadingUSDC, refetch: refetchBalance } = useUSDCBalance();
   const { formatted: vaultUSDCBalance, refetch: refetchVaultBalance } = useVaultBalance();
   const { formatted: eurcBalance } = useEURCBalance();
   const { formatted: nativeBalance } = useNativeBalance();
   const { transactions, isLoading: loadingTx, refetch: refetchTx, isDemo } = useTransactionHistory();
   const metrics = useCashFlowMetrics(transactions);
+
+  if (isConnecting) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 120px)', gap: '16px' }}>
+        <div className="spinner" style={{ width: '32px', height: '32px' }} />
+        <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>Restoring secure session...</span>
+      </div>
+    );
+  }
 
   if (!isConnected) {
     return <LandingPage />;

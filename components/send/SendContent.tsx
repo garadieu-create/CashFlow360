@@ -24,7 +24,7 @@ function parseError(error: any): string {
 }
 
 export default function SendContent() {
-  const { isConnected, address } = useAccount();
+  const { isConnected, address, isConnecting } = useAccount();
   const { formatted: balance, refetch: refetchUSDC } = useUSDCBalance();
   const { formatted: vaultBalance, refetch: refetchVault } = useVaultBalance();
   const [recipient, setRecipient] = useState('');
@@ -145,6 +145,15 @@ export default function SendContent() {
     }
   }, [isPending, isConfirming, isSuccess, error, txHash]);
 
+  if (isConnecting) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '16px' }}>
+        <div className="spinner" style={{ width: '32px', height: '32px' }} />
+        <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>Restoring secure session...</span>
+      </div>
+    );
+  }
+
   if (!isConnected) {
     return (
       <div className="empty-state">
@@ -248,11 +257,20 @@ export default function SendContent() {
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xl)' }}>
             {/* Recipient */}
             <div className="input-group">
-              <label className="input-label">Recipient Address</label>
+              <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                Recipient Address
+                <span className="tooltip-container">
+                  <span className="tooltip-trigger">?</span>
+                  <span className="tooltip-content">
+                    The destination EOA or contract address on Arc Testnet. Double check to prevent loss of funds.
+                  </span>
+                </span>
+              </label>
               <input
+                id="send-recipient-input"
                 type="text"
                 className="input input-mono"
-                placeholder="0x..."
+                placeholder="0x... (e.g. 0x71C7656EC7ab88b098defB751B7401B5f6d8976F)"
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
                 disabled={isPending || isConfirming}
@@ -261,13 +279,22 @@ export default function SendContent() {
 
             {/* Amount */}
             <div className="input-group">
-              <label className="input-label">Amount (USDC)</label>
+              <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                Amount (USDC)
+                <span className="tooltip-container">
+                  <span className="tooltip-trigger">?</span>
+                  <span className="tooltip-content">
+                    The exact amount of USDC you want to transfer. Maximum transfer is bounded by your Vault Balance.
+                  </span>
+                </span>
+              </label>
               <div style={{ position: 'relative' }}>
                 <input
+                  id="send-amount-input"
                   type="number"
                   className="input input-mono"
                   style={{ paddingRight: '68px' }}
-                  placeholder="0.00"
+                  placeholder="0.00 (e.g. 150.00)"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   disabled={isPending || isConfirming}
@@ -286,8 +313,17 @@ export default function SendContent() {
 
             {/* Category Dropdown */}
             <div className="input-group">
-              <label className="input-label">Transaction Category</label>
+              <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                Transaction Category
+                <span className="tooltip-container">
+                  <span className="tooltip-trigger">?</span>
+                  <span className="tooltip-content">
+                    Helps classify the transfer for runway analytics and cash flow mapping (Sankey visualization).
+                  </span>
+                </span>
+              </label>
               <select
+                id="send-category-select"
                 className="input input-mono"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
@@ -329,6 +365,7 @@ export default function SendContent() {
             </div>
 
             <LoadingButton
+              id="send-submit-btn"
               variant="primary"
               size="lg"
               onClick={handleSend}

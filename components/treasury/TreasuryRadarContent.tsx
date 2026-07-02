@@ -9,6 +9,7 @@ import { USDC_ABI } from '@/lib/contracts';
 import { useReadContract } from 'wagmi';
 import { formatUnits } from 'viem';
 import { WalletEmptyState } from '@/components/ui/WalletEmptyState';
+import { TokenOrChainIcon } from '@/components/ui/USDCIcon';
 
 // Known USDC addresses on testnets
 const TESTNET_USDC: Record<number, `0x${string}`> = {
@@ -99,8 +100,17 @@ function useMultiChainBalances() {
 }
 
 export default function TreasuryRadarContent() {
-  const { isConnected } = useAccount();
+  const { isConnected, isConnecting } = useAccount();
   const { chains, totalBalance, isDemo } = useMultiChainBalances();
+
+  if (isConnecting) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '16px' }}>
+        <div className="spinner" style={{ width: '32px', height: '32px' }} />
+        <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>Restoring secure session...</span>
+      </div>
+    );
+  }
 
   if (!isConnected) {
     return (
@@ -266,19 +276,10 @@ export default function TreasuryRadarContent() {
                       strokeWidth={2}
                     />
 
-                    {/* Chain symbol */}
-                    <text
-                      x={x}
-                      y={y + 1}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      fill={chain.color}
-                      fontSize={10}
-                      fontWeight={700}
-                      fontFamily="Inter, sans-serif"
-                    >
-                      {chain.symbol}
-                    </text>
+                    {/* Chain Icon Wrapper */}
+                    <g transform={`translate(${x - 14}, ${y - 14})`}>
+                      <TokenOrChainIcon name={chain.chainName} size={28} />
+                    </g>
 
                     {/* Chain name label */}
                     <text
@@ -317,29 +318,9 @@ export default function TreasuryRadarContent() {
                   <stop offset="100%" stopColor="#F54E00" />
                 </radialGradient>
               </defs>
-              <text
-                x={centerX}
-                y={centerY - 4}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fill="white"
-                fontSize={12}
-                fontWeight={800}
-                fontFamily="Inter, sans-serif"
-              >
-                ARC
-              </text>
-              <text
-                x={centerX}
-                y={centerY + 10}
-                textAnchor="middle"
-                fill="rgba(255,255,255,0.7)"
-                fontSize={8}
-                fontWeight={600}
-                fontFamily="Inter, sans-serif"
-              >
-                HUB
-              </text>
+              <g transform={`translate(${centerX - 20}, ${centerY - 20})`}>
+                <TokenOrChainIcon name="arc" size={40} />
+              </g>
             </svg>
           </div>
         </motion.div>
@@ -360,7 +341,7 @@ export default function TreasuryRadarContent() {
                 <div className="card-body-compact">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: chain.color }} />
+                      <TokenOrChainIcon name={chain.chainName} size={18} />
                       <span style={{ fontSize: 13, fontWeight: 600 }}>{chain.chainName}</span>
                     </div>
                     <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 16 }}>

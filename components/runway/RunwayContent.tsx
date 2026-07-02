@@ -12,7 +12,7 @@ function formatUSD(val: number): string {
 }
 
 export default function RunwayContent() {
-  const { isConnected } = useAccount();
+  const { isConnected, isConnecting } = useAccount();
   const { formatted: usdcBalance } = useUSDCBalance();
   const { transactions } = useTransactionHistory();
   const metrics = useCashFlowMetrics(transactions);
@@ -83,6 +83,15 @@ export default function RunwayContent() {
       status,
     };
   }, [transactions, metrics, revenueChange, extraExpense, currentBalance]);
+
+  if (isConnecting) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '16px' }}>
+        <div className="spinner" style={{ width: '32px', height: '32px' }} />
+        <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>Restoring secure session...</span>
+      </div>
+    );
+  }
 
   if (!isConnected) {
     return (

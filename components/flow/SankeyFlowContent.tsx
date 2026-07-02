@@ -7,9 +7,18 @@ import { RefreshCw } from 'lucide-react';
 import { WalletEmptyState } from '@/components/ui/WalletEmptyState';
 
 export default function SankeyFlowContent() {
-  const { isConnected } = useAccount();
+  const { isConnected, isConnecting } = useAccount();
   const { transactions, isLoading, refetch } = useTransactionHistory();
   const metrics = useCashFlowMetrics(transactions);
+
+  if (isConnecting) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '16px' }}>
+        <div className="spinner" style={{ width: '32px', height: '32px' }} />
+        <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>Restoring secure session...</span>
+      </div>
+    );
+  }
 
   if (!isConnected) {
     return (

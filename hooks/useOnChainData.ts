@@ -11,7 +11,7 @@ import { useCircleWallet } from '@/context/CircleWalletContext';
 
 export function useAccount() {
   const { address, isConnected, isLoading } = useCircleWallet();
-  return { address, isConnected, isConnecting: isLoading };
+  return { address: address ?? undefined, isConnected, isConnecting: isLoading };
 }
 
 export function useWriteContract() {
@@ -20,7 +20,7 @@ export function useWriteContract() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<any>(null);
-  const [data, setData] = useState<`0x${string}` | null>(null);
+  const [data, setData] = useState<`0x${string}` | undefined>(undefined);
   const txLockRef = React.useRef(false);
 
   const writeContractAsync = useCallback(async ({ address, abi, functionName, args, chainId }: any) => {
@@ -33,7 +33,7 @@ export function useWriteContract() {
     setIsSuccess(false);
     setIsError(false);
     setError(null);
-    setData(null);
+    setData(undefined);
     try {
       const hash = await executeContractWrite(address, abi, functionName, args || [], chainId);
       setData(hash);
@@ -67,7 +67,7 @@ export function useWriteContract() {
       setIsSuccess(false);
       setIsError(false);
       setError(null);
-      setData(null);
+      setData(undefined);
       txLockRef.current = false;
     }
   };
@@ -206,7 +206,7 @@ export function useNativeBalance() {
   const { address } = useAccount();
 
   const { data, isLoading, refetch } = useBalance({
-    address,
+    address: address ?? undefined,
     chainId: arcTestnet.id,
     query: {
       enabled: !!address,

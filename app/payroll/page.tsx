@@ -571,7 +571,7 @@ export default function PayrollPage() {
                 {isStreaming ? 'STREAM ACTIVE' : 'STREAM IDLE'}
               </span>
             </div>
-            <div className="card-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', padding: '20px' }}>
+            <div className="card-body grid-2" style={{ padding: '20px' }}>
               
               {/* Left Column: Ticker & Visual stream */}
               <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 8, padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '220px' }}>
@@ -604,15 +604,21 @@ export default function PayrollPage() {
               {/* Right Column: Controls */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
                     Recipient Contractor Wallet
+                    <span className="tooltip-container">
+                      <span className="tooltip-trigger">?</span>
+                      <span className="tooltip-content">
+                        The address receiving the payroll wage stream on Arc Testnet.
+                      </span>
+                    </span>
                   </label>
                   <input 
                     type="text" 
-                    className="form-control"
+                    className="input input-mono"
                     value={streamContractor}
                     onChange={(e) => setStreamContractor(e.target.value)}
-                    placeholder="0x..."
+                    placeholder="0x... (e.g. 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045)"
                     style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}
                   />
                 </div>
@@ -683,14 +689,20 @@ export default function PayrollPage() {
                   <ModalBody>
                     <form onSubmit={handleCreateJob} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>
                           Contractor Wallet Address
+                          <span className="tooltip-container">
+                            <span className="tooltip-trigger">?</span>
+                            <span className="tooltip-content">
+                              Destination wallet address that can claim this escrow once payroll job milestones are reached.
+                            </span>
+                          </span>
                         </label>
                         <input
                           type="text"
                           required
-                          placeholder="0x..."
-                          className="form-control"
+                          placeholder="0x... (e.g. 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045)"
+                          className="input input-mono"
                           value={contractorAddress}
                           onChange={(e) => setContractorAddress(e.target.value)}
                           style={{ fontFamily: 'var(--font-mono)' }}
@@ -698,15 +710,21 @@ export default function PayrollPage() {
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>
                           Payroll Payout Amount (USDC)
+                          <span className="tooltip-container">
+                            <span className="tooltip-trigger">?</span>
+                            <span className="tooltip-content">
+                              Total USDC escrowed balance to be distributed upon payroll approval.
+                            </span>
+                          </span>
                         </label>
                         <input
                           type="number"
                           required
                           step="0.01"
-                          placeholder="0.00"
-                          className="form-control"
+                          placeholder="0.00 (e.g. 1200.00)"
+                          className="input input-mono"
                           value={paymentAmount}
                           onChange={(e) => setPaymentAmount(e.target.value)}
                         />

@@ -5,6 +5,7 @@ import fs from 'fs';
 import { createPublicClient, http, formatUnits } from 'viem';
 import { arcTestnet, USDC_ADDRESS } from '../../../lib/arc-config';
 import { CASHFLOW_VAULT_ADDRESS, CASHFLOW_VAULT_ABI } from '../../../lib/contracts';
+import { bootstrapOnChainData } from '../../../lib/seeder';
 
 const DB_PATH = path.join(process.cwd(), 'agent', 'agent.db');
 
@@ -14,6 +15,7 @@ function runDb(sql: string, params: any[] = []): Promise<void> {
       fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
     }
     const db = new sqlite3.Database(DB_PATH);
+    db.configure("busyTimeout", 10000);
     db.run(sql, params, (err) => {
       db.close();
       if (err) reject(err);
@@ -28,6 +30,7 @@ function queryDb(sql: string, params: any[] = []): Promise<any[]> {
       return resolve([]);
     }
     const db = new sqlite3.Database(DB_PATH);
+    db.configure("busyTimeout", 10000);
     db.all(sql, params, (err, rows) => {
       db.close();
       if (err) reject(err);
@@ -59,87 +62,6 @@ async function ensureTables() {
   `);
 }
 
-function generateSimulatedTransactions(userAddress: string) {
-  const user = userAddress.toLowerCase();
-  const now = Math.floor(Date.now() / 1000);
-  const partners = [
-    '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', // Customer A
-    '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', // Customer B
-    '0x90F79bf6EB2c4f870365E785982E1f101E93b906', // Supplier A
-    '0x15d34AAf54a67C681F2F2B412493922c01d9f82e', // Contractor A
-    '0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f', // SaaS Provider
-    '0xa0Ee7A142d267C1f36714E4a8F75612F20a79720', // Gas station
-  ];
-
-  const txTemplates = [
-    { type: 'inflow', partner: partners[0], category: 'Customer Invoice', baseAmount: 2400 },
-    { type: 'inflow', partner: partners[1], category: 'Customer Invoice', baseAmount: 1850 },
-    { type: 'outflow', partner: partners[2], category: 'Hosting Fees', baseAmount: 350 },
-    { type: 'outflow', partner: partners[3], category: 'Contractor Payment', baseAmount: 1200 },
-    { type: 'outflow', partner: partners[4], category: 'Software Licenses', baseAmount: 89 },
-    { type: 'inflow', partner: partners[0], category: 'Customer Invoice', baseAmount: 3200 },
-    { type: 'outflow', partner: partners[5], category: 'Gas Rebalance', baseAmount: 45 },
-    { type: 'inflow', partner: partners[1], category: 'SaaS Licensing', baseAmount: 950 },
-  ];
-
-  const deposits: any[] = [];
-  const withdrawals: any[] = [];
-  const transfers: any[] = [];
-
-  for (let i = 35; i >= 1; i--) {
-    const template = txTemplates[i % txTemplates.length];
-    const timestamp = now - i * 20 * 3600 - Math.floor(Math.random() * 8 * 3600);
-    const variance = 1 + (Math.random() * 0.3 - 0.15);
-    const amount = (template.baseAmount * variance).toFixed(2);
-    const txHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
-
-    transfers.push({
-      id: `sim_tx_${i}`,
-      from: template.type === 'inflow' ? template.partner : user,
-      to: template.type === 'inflow' ? user : template.partner,
-      amount,
-      category: template.category,
-      timestamp,
-      txHash,
-      isSimulated: true
-    });
-  }
-
-  // Vault deposits & withdrawals
-  const vaultTxTemplates = [
-    { type: 'deposit', amount: 5000, category: 'Vault Deposit' },
-    { type: 'withdrawal', amount: 1500, category: 'Vault Withdrawal' },
-    { type: 'deposit', amount: 8000, category: 'Vault Deposit' },
-  ];
-
-  vaultTxTemplates.forEach((v, index) => {
-    const timestamp = now - (15 - index * 5) * 24 * 3600;
-    const txHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
-    
-    if (v.type === 'deposit') {
-      deposits.push({
-        id: `sim_v_dep_${index}`,
-        from: user,
-        amount: v.amount.toFixed(2),
-        timestamp,
-        txHash,
-        isSimulated: true
-      });
-    } else {
-      withdrawals.push({
-        id: `sim_v_wth_${index}`,
-        to: user,
-        amount: v.amount.toFixed(2),
-        timestamp,
-        txHash,
-        isSimulated: true
-      });
-    }
-  });
-
-  return { deposits, withdrawals, transfers };
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -150,7 +72,27 @@ export async function POST(req: NextRequest) {
 
     await ensureTables();
 
-    // 1. Check if cache is stale (older than 10 seconds)
+        // 1. Check if we need to bootstrap real transactions for a new user address
+    let forceUpdate = false;
+    if (userAddress) {
+      const hasUserTxs = await queryDb(
+        `SELECT id FROM cached_events WHERE from_address = ? OR to_address = ? LIMIT 1`,
+        [userAddress, userAddress]
+      );
+      if (hasUserTxs.length === 0) {
+        // Instantly seed local cache fallback so the user sees data immediately
+        const { seedLocalCacheFallback } = await import('../../../lib/seeder');
+        await seedLocalCacheFallback(userAddress);
+        forceUpdate = true;
+
+        // Kick off real on-chain transaction seeding in the background (fire-and-forget)
+        bootstrapOnChainData(userAddress).catch((err) => {
+          console.error('[BACKGROUND BOOTSTRAP ERROR]:', err.message);
+        });
+      }
+    }
+
+    // 2. Check if cache is stale (older than 10 seconds)
     const lastUpdateRow = await queryDb(`SELECT value FROM indexer_state WHERE key = 'last_update'`);
     const lastUpdate = parseInt(lastUpdateRow[0]?.value || '0');
     const now = Date.now();
@@ -160,7 +102,7 @@ export async function POST(req: NextRequest) {
       transport: http('https://rpc.testnet.arc.network')
     });
 
-    if (now - lastUpdate > 10000) {
+    if (forceUpdate || (now - lastUpdate > 10000)) {
       // Fetch latest logs from Arc RPC to update indexer cache
       const currentBlock = await client.getBlockNumber();
       const lastIndexedBlockRow = await queryDb(`SELECT value FROM indexer_state WHERE key = 'last_indexed_block'`);
@@ -282,7 +224,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Fetch cache records from SQLite
+    // 3. Fetch cache records from SQLite
     const cachedRows = await queryDb(`SELECT * FROM cached_events ORDER BY timestamp DESC`);
 
     // Parse and group rows
@@ -318,48 +260,23 @@ export async function POST(req: NextRequest) {
         txHash: row.tx_hash
       }));
 
-    let isDemoMode = false;
-    let finalDeposits = deposits;
-    let finalWithdrawals = withdrawals;
-    let finalTransfers = transfers;
-
-    if (userAddress) {
-      const hasUserTxs = cachedRows.some(row => 
-        row.from_address?.toLowerCase() === userAddress || 
-        row.to_address?.toLowerCase() === userAddress
-      );
-      if (!hasUserTxs) {
-        isDemoMode = true;
-        const sim = generateSimulatedTransactions(userAddress);
-        finalDeposits = sim.deposits;
-        finalWithdrawals = sim.withdrawals;
-        finalTransfers = sim.transfers;
-      }
-    } else if (cachedRows.length === 0) {
-      isDemoMode = true;
-      const sim = generateSimulatedTransactions('0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b');
-      finalDeposits = sim.deposits;
-      finalWithdrawals = sim.withdrawals;
-      finalTransfers = sim.transfers;
-    }
-
     // Simple GraphQL-style resolver mapping
     const data: Record<string, any> = {};
     if (query.includes('deposits')) {
-      data.deposits = finalDeposits;
+      data.deposits = deposits;
     }
     if (query.includes('withdrawals')) {
-      data.withdrawals = finalWithdrawals;
+      data.withdrawals = withdrawals;
     }
     if (query.includes('transfers') || query === '') {
-      data.transfers = finalTransfers;
+      data.transfers = transfers;
     }
 
     // Fallback if query requests everything
     if (Object.keys(data).length === 0) {
-      data.deposits = finalDeposits;
-      data.withdrawals = finalWithdrawals;
-      data.transfers = finalTransfers;
+      data.deposits = deposits;
+      data.withdrawals = withdrawals;
+      data.transfers = transfers;
     }
 
     return NextResponse.json({
@@ -369,7 +286,7 @@ export async function POST(req: NextRequest) {
         syncState: "synced",
         lastUpdate,
         eventsCount: cachedRows.length,
-        isDemoMode
+        isDemoMode: false
       }
     });
 
@@ -377,3 +294,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ errors: [{ message: err.message }] }, { status: 500 });
   }
 }
+

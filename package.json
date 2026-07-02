@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "agent:run": "tsx agent/treasuryAgent.ts",
     "agent:login": "tsx agent/treasuryAgent.ts --login"
@@ -14,14 +14,16 @@
     "@circle-fin/bridge-kit": "^1.10.2",
     "@circle-fin/cli": "^0.0.5",
     "@circle-fin/modular-wallets-core": "^1.0.13",
+    "@circle-fin/w3s-pw-web-sdk": "^1.1.11",
     "@rainbow-me/rainbowkit": "^2.2.4",
     "@tanstack/react-query": "^5.62.0",
     "@types/sqlite3": "^3.1.11",
+    "canvas-confetti": "^1.9.4",
     "d3": "^7.9.0",
     "d3-sankey": "^0.12.3",
     "framer-motion": "^11.15.0",
     "lucide-react": "^0.475.0",
-    "next": "14.2.35",
+    "next": "^16.2.10",
     "react": "^18",
     "react-dom": "^18",
     "react-hot-toast": "^2.5.2",
@@ -31,6 +33,7 @@
     "wagmi": "^2.14.9"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/d3": "^7.4.3",
     "@types/d3-sankey": "^0.12.4",
     "@types/node": "^20",

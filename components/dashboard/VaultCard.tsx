@@ -126,7 +126,7 @@ export function VaultCard() {
   if (!isConnected) return null;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-lg)', marginBottom: 'var(--space-lg)' }}>
+    <div className="grid-2" style={{ marginBottom: 'var(--space-lg)' }}>
       {/* Deposit Panel */}
       <motion.div 
         className="card"
@@ -145,12 +145,21 @@ export function VaultCard() {
         </div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
           <div className="input-group">
-            <label className="input-label">Deposit Amount (USDC)</label>
+            <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+              Deposit Amount (USDC)
+              <span className="tooltip-container">
+                <span className="tooltip-trigger">?</span>
+                <span className="tooltip-content">
+                  The quantity of USDC to deposit from your wallet into the safe escrow vault.
+                </span>
+              </span>
+            </label>
             <div style={{ position: 'relative' }}>
               <input
+                id="vault-deposit-input"
                 type="number"
                 className="input input-mono"
-                placeholder="0.00"
+                placeholder="0.00 (e.g. 250.00)"
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(e.target.value)}
                 disabled={isApproving || isDepositing}
@@ -170,6 +179,7 @@ export function VaultCard() {
           <div style={{ display: 'flex', gap: 'var(--space-md)' }}>
             {needsApproval ? (
               <button 
+                id="vault-approve-btn"
                 className="btn btn-primary" 
                 onClick={handleApprove} 
                 disabled={isApproving || !depositAmount}
@@ -179,6 +189,7 @@ export function VaultCard() {
               </button>
             ) : (
               <button 
+                id="vault-deposit-btn"
                 className="btn btn-primary" 
                 onClick={handleDeposit} 
                 disabled={isDepositing || !depositAmount}
@@ -209,12 +220,21 @@ export function VaultCard() {
         </div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
           <div className="input-group">
-            <label className="input-label">Withdraw Amount (USDC)</label>
+            <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+              Withdraw Amount (USDC)
+              <span className="tooltip-container">
+                <span className="tooltip-trigger">?</span>
+                <span className="tooltip-content">
+                  The quantity of USDC to withdraw from the escrow vault back to your active smart account wallet.
+                </span>
+              </span>
+            </label>
             <div style={{ position: 'relative' }}>
               <input
+                id="vault-withdraw-input"
                 type="number"
                 className="input input-mono"
-                placeholder="0.00"
+                placeholder="0.00 (e.g. 100.00)"
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
                 disabled={isWithdrawing}
@@ -232,6 +252,7 @@ export function VaultCard() {
           </div>
 
           <button 
+            id="vault-withdraw-btn"
             className="btn btn-primary" 
             onClick={handleWithdraw} 
             disabled={isWithdrawing || !withdrawAmount}

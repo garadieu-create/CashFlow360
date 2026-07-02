@@ -20,14 +20,23 @@ export function useWriteContract() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<any>(null);
+  const [data, setData] = useState<`0x${string}` | null>(null);
+  const txLockRef = React.useRef(false);
 
   const writeContractAsync = useCallback(async ({ address, abi, functionName, args, chainId }: any) => {
+    if (txLockRef.current) {
+      toast.error('A transaction is already in progress.');
+      throw new Error('A transaction is already in progress.');
+    }
+    txLockRef.current = true;
     setIsPending(true);
     setIsSuccess(false);
     setIsError(false);
     setError(null);
+    setData(null);
     try {
       const hash = await executeContractWrite(address, abi, functionName, args || [], chainId);
+      setData(hash);
       setIsSuccess(true);
       return hash;
     } catch (err) {
@@ -36,6 +45,7 @@ export function useWriteContract() {
       throw err;
     } finally {
       setIsPending(false);
+      txLockRef.current = false;
     }
   }, [executeContractWrite]);
 
@@ -51,12 +61,14 @@ export function useWriteContract() {
     isError,
     error,
     status: isPending ? 'pending' : isSuccess ? 'success' : isError ? 'error' : 'idle',
-    data: null as any,
+    data,
     reset: () => {
       setIsPending(false);
       setIsSuccess(false);
       setIsError(false);
       setError(null);
+      setData(null);
+      txLockRef.current = false;
     }
   };
 }
@@ -75,6 +87,25 @@ export interface Transaction {
   blockNumber: bigint;
 }
 
+// Custom hook to trigger refetch when a new block is mined (real-time balance update)
+function useBlockRefetch(refetch: () => void) {
+  const publicClient = usePublicClient();
+
+  useEffect(() => {
+    if (!publicClient || !refetch) return;
+    try {
+      const unwatch = publicClient.watchBlockNumber({
+        onBlockNumber: () => {
+          refetch();
+        },
+      });
+      return () => unwatch();
+    } catch (err) {
+      console.warn('Failed to watch block number:', err);
+    }
+  }, [publicClient, refetch]);
+}
+
 export function useUSDCBalance() {
   const { address } = useAccount();
 
@@ -86,9 +117,11 @@ export function useUSDCBalance() {
     chainId: arcTestnet.id,
     query: {
       enabled: !!address,
-      refetchInterval: 10000,
+      refetchInterval: 5000,
     },
   });
+
+  useBlockRefetch(refetch);
 
   const { isDemo } = useTransactionHistory();
 
@@ -116,9 +149,11 @@ export function useVaultBalance() {
     chainId: arcTestnet.id,
     query: {
       enabled: !!address,
-      refetchInterval: 10000,
+      refetchInterval: 5000,
     },
   });
+
+  useBlockRefetch(refetch);
 
   const { isDemo } = useTransactionHistory();
 
@@ -138,7 +173,7 @@ export function useVaultBalance() {
 export function useEURCBalance() {
   const { address } = useAccount();
 
-  const { data: balance, isLoading } = useReadContract({
+  const { data: balance, isLoading, refetch } = useReadContract({
     address: EURC_ADDRESS,
     abi: USDC_ABI,
     functionName: 'balanceOf',
@@ -146,9 +181,11 @@ export function useEURCBalance() {
     chainId: arcTestnet.id,
     query: {
       enabled: !!address,
-      refetchInterval: 15000,
+      refetchInterval: 5000,
     },
   });
+
+  useBlockRefetch(refetch);
 
   const { isDemo } = useTransactionHistory();
 
@@ -160,6 +197,7 @@ export function useEURCBalance() {
     balance: isDemo ? 3200000000n : (balance as bigint | undefined), 
     formatted, 
     isLoading: isDemo ? false : isLoading,
+    refetch,
     isDemo
   };
 }
@@ -167,14 +205,16 @@ export function useEURCBalance() {
 export function useNativeBalance() {
   const { address } = useAccount();
 
-  const { data, isLoading } = useBalance({
+  const { data, isLoading, refetch } = useBalance({
     address,
     chainId: arcTestnet.id,
     query: {
       enabled: !!address,
-      refetchInterval: 10000,
+      refetchInterval: 5000,
     },
   });
+
+  useBlockRefetch(refetch);
 
   const { isDemo } = useTransactionHistory();
 
@@ -183,6 +223,7 @@ export function useNativeBalance() {
     formatted: isDemo ? '150.00' : (data?.formatted || '0.00'),
     symbol: data?.symbol || 'USDC',
     isLoading: isDemo ? false : isLoading,
+    refetch,
     isDemo,
   };
 }

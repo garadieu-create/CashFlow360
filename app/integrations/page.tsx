@@ -305,7 +305,15 @@ export default function IntegrationsPage() {
                 </div>
 
                 <div className="input-group">
-                  <label className="input-label">Environment</label>
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                    Environment
+                    <span className="tooltip-container">
+                      <span className="tooltip-trigger">?</span>
+                      <span className="tooltip-content">
+                        Toggle between developer sandbox environment (for testing) and production environment (for real funds).
+                      </span>
+                    </span>
+                  </label>
                   <select 
                     className="input" 
                     value={tempEnv} 
@@ -318,13 +326,21 @@ export default function IntegrationsPage() {
                 </div>
 
                 <div className="input-group">
-                  <label className="input-label">Circle API Key or Kit Key</label>
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                    Circle API Key or Kit Key
+                    <span className="tooltip-container">
+                      <span className="tooltip-trigger">?</span>
+                      <span className="tooltip-content">
+                        The SDK key generated from your Circle developer console. Do not share this key with unauthorized agents.
+                      </span>
+                    </span>
+                  </label>
                   <input 
                     type="password"
                     className="input input-mono"
                     value={tempApiKey}
                     onChange={(e) => setTempApiKey(e.target.value)}
-                    placeholder="e.g. sk_test_circle_..."
+                    placeholder="e.g. sk_test_circle_... (or sk_live_...)"
                     disabled={isVerifying}
                   />
                   <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 2 }}>

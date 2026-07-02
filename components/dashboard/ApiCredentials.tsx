@@ -214,16 +214,23 @@ export function ApiCredentials() {
 
           {/* Endpoint Input */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
               x402 Monetized Endpoint URL
+              <span className="tooltip-container">
+                <span className="tooltip-trigger">?</span>
+                <span className="tooltip-content">
+                  This read-only URL is the endpoint external API queries call to fetch your cash flow runway data, automatically settled via Circle x402 nanopayments.
+                </span>
+              </span>
             </label>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 type="text"
                 readOnly
                 value={endpoint}
-                className="form-control"
-                style={{ flex: 1, padding: '8px 12px', fontSize: 12, fontFamily: 'var(--font-mono)', background: 'var(--bg-elevated)' }}
+                placeholder="https://cashflow360.api/x402/query..."
+                className="input input-mono"
+                style={{ flex: 1, fontSize: 12, background: 'var(--bg-elevated)' }}
               />
               <button 
                 className="btn btn-secondary" 

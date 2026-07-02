@@ -335,7 +335,15 @@ export default function AlertsPage() {
               </div>
               <form onSubmit={handleCreateRule} className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div className="input-group">
-                  <label className="input-label">Rule Type</label>
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                    Rule Type
+                    <span className="tooltip-container">
+                      <span className="tooltip-trigger">?</span>
+                      <span className="tooltip-content">
+                        The category of condition to monitor. 'Low Balance' executes an actual on-chain contract trigger.
+                      </span>
+                    </span>
+                  </label>
                   <select className="input" value={ruleType} onChange={(e) => setRuleType(e.target.value)}>
                     <option value="Low Balance">Low Balance</option>
                     <option value="Large Outflow">Large Outflow</option>
@@ -345,33 +353,57 @@ export default function AlertsPage() {
                 </div>
                 {ruleType === 'Low Balance' ? (
                   <div className="input-group">
-                    <label className="input-label">Threshold Amount (USDC)</label>
+                    <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                      Threshold Amount (USDC)
+                      <span className="tooltip-container">
+                        <span className="tooltip-trigger">?</span>
+                        <span className="tooltip-content">
+                          The minimum USDC balance that will trigger this low balance rule. Saved on-chain.
+                        </span>
+                      </span>
+                    </label>
                     <input 
                       type="number" 
                       className="input input-mono" 
                       value={thresholdInput} 
                       onChange={(e) => setThresholdInput(e.target.value)} 
-                      placeholder="e.g. 1000"
+                      placeholder="e.g. 1000 (USDC threshold limit)"
                       required
                       disabled={isSubmitting}
                     />
                   </div>
                 ) : (
                   <div className="input-group">
-                    <label className="input-label">Condition (Expression)</label>
+                    <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                      Condition (Expression)
+                      <span className="tooltip-container">
+                        <span className="tooltip-trigger">?</span>
+                        <span className="tooltip-content">
+                          The descriptive logic condition expression evaluated by the watcher agent.
+                        </span>
+                      </span>
+                    </label>
                     <input 
                       type="text" 
                       className="input input-mono" 
                       value={condition} 
                       onChange={(e) => setCondition(e.target.value)} 
-                      placeholder="e.g. USDC balance < $1,000"
+                      placeholder="e.g. USDC balance < $1,000 (or outflow > $5,000)"
                       required
                       disabled={isSubmitting}
                     />
                   </div>
                 )}
                 <div className="input-group">
-                  <label className="input-label">Severity Level</label>
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                    Severity Level
+                    <span className="tooltip-container">
+                      <span className="tooltip-trigger">?</span>
+                      <span className="tooltip-content">
+                        Categorizes the alert importance level: Critical (requires immediate action), Warning (caution), Info (informational status).
+                      </span>
+                    </span>
+                  </label>
                   <select className="input" value={severity} onChange={(e) => setSeverity(e.target.value as any)} disabled={isSubmitting}>
                     <option value="info">Info</option>
                     <option value="warning">Warning</option>
@@ -379,7 +411,15 @@ export default function AlertsPage() {
                   </select>
                 </div>
                 <div className="input-group">
-                  <label className="input-label">Initial Status</label>
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                    Initial Status
+                    <span className="tooltip-container">
+                      <span className="tooltip-trigger">?</span>
+                      <span className="tooltip-content">
+                        Define whether this rule begins scanning immediately (Active) or is created in a suspended state (Paused).
+                      </span>
+                    </span>
+                  </label>
                   <select className="input" value={status} onChange={(e) => setStatus(e.target.value as any)} disabled={isSubmitting}>
                     <option value="active">Active (Enabled)</option>
                     <option value="paused">Paused (Disabled)</option>
@@ -436,7 +476,15 @@ export default function AlertsPage() {
               </div>
               <form onSubmit={handleEditRule} className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div className="input-group">
-                  <label className="input-label">Rule Type</label>
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                    Rule Type
+                    <span className="tooltip-container">
+                      <span className="tooltip-trigger">?</span>
+                      <span className="tooltip-content">
+                        The category of condition to monitor. 'Low Balance' executes an actual on-chain contract trigger.
+                      </span>
+                    </span>
+                  </label>
                   <select className="input" value={ruleType} onChange={(e) => setRuleType(e.target.value)}>
                     <option value="Low Balance">Low Balance</option>
                     <option value="Large Outflow">Large Outflow</option>
@@ -446,33 +494,57 @@ export default function AlertsPage() {
                 </div>
                 {ruleType === 'Low Balance' ? (
                   <div className="input-group">
-                    <label className="input-label">Threshold Amount (USDC)</label>
+                    <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                      Threshold Amount (USDC)
+                      <span className="tooltip-container">
+                        <span className="tooltip-trigger">?</span>
+                        <span className="tooltip-content">
+                          The minimum USDC balance that will trigger this low balance rule. Saved on-chain.
+                        </span>
+                      </span>
+                    </label>
                     <input 
                       type="number" 
                       className="input input-mono" 
                       value={thresholdInput} 
                       onChange={(e) => setThresholdInput(e.target.value)} 
-                      placeholder="e.g. 1000"
+                      placeholder="e.g. 1000 (USDC threshold limit)"
                       required
                       disabled={isSubmitting}
                     />
                   </div>
                 ) : (
                   <div className="input-group">
-                    <label className="input-label">Condition (Expression)</label>
+                    <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                      Condition (Expression)
+                      <span className="tooltip-container">
+                        <span className="tooltip-trigger">?</span>
+                        <span className="tooltip-content">
+                          The descriptive logic condition expression evaluated by the watcher agent.
+                        </span>
+                      </span>
+                    </label>
                     <input 
                       type="text" 
                       className="input input-mono" 
                       value={condition} 
                       onChange={(e) => setCondition(e.target.value)} 
-                      placeholder="e.g. USDC balance < $1,000"
+                      placeholder="e.g. USDC balance < $1,000 (or outflow > $5,000)"
                       required
                       disabled={isSubmitting}
                     />
                   </div>
                 )}
                 <div className="input-group">
-                  <label className="input-label">Severity Level</label>
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                    Severity Level
+                    <span className="tooltip-container">
+                      <span className="tooltip-trigger">?</span>
+                      <span className="tooltip-content">
+                        Categorizes the alert importance level: Critical (requires immediate action), Warning (caution), Info (informational status).
+                      </span>
+                    </span>
+                  </label>
                   <select className="input" value={severity} onChange={(e) => setSeverity(e.target.value as any)} disabled={isSubmitting}>
                     <option value="info">Info</option>
                     <option value="warning">Warning</option>
@@ -480,7 +552,15 @@ export default function AlertsPage() {
                   </select>
                 </div>
                 <div className="input-group">
-                  <label className="input-label">Status</label>
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                    Status
+                    <span className="tooltip-container">
+                      <span className="tooltip-trigger">?</span>
+                      <span className="tooltip-content">
+                        Define whether this rule scans immediately (Active) or is suspended (Paused).
+                      </span>
+                    </span>
+                  </label>
                   <select className="input" value={status} onChange={(e) => setStatus(e.target.value as any)} disabled={isSubmitting}>
                     <option value="active">Active (Enabled)</option>
                     <option value="paused">Paused (Disabled)</option>

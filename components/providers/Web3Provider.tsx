@@ -8,6 +8,7 @@ import { GlobalModal } from '@/components/ui/GlobalModal';
 import { useLowBalanceWatcher } from '@/hooks/useOnChainData';
 import { CircleWalletProvider } from '@/context/CircleWalletContext';
 import { LoadingProvider } from '@/components/providers/LoadingProvider';
+import { FloatingWidgets } from '@/components/ui/FloatingWidgets';
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
               <LowBalanceWatcher />
               {children}
               <GlobalModal />
+              <FloatingWidgets />
             </ModalProvider>
           </LoadingProvider>
         </CircleWalletProvider>

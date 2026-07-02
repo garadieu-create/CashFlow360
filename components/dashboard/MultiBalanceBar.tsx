@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
+import { TokenOrChainIcon } from '@/components/ui/USDCIcon';
 
 interface MultiBalanceBarProps {
   usdcBalance: string;
@@ -20,6 +21,7 @@ export function MultiBalanceBar({ usdcBalance, eurcBalance, nativeBalance, addre
       <div className="card-body-compact" style={{ display: 'flex', gap: 'var(--space-2xl)', alignItems: 'center', minWidth: 'max-content' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+            <TokenOrChainIcon name="usdc" size={14} />
             <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               USDC (ERC-20)
             </span>
@@ -39,6 +41,7 @@ export function MultiBalanceBar({ usdcBalance, eurcBalance, nativeBalance, addre
         <div style={{ width: 1, height: 40, background: 'var(--border-primary)' }} />
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+            <TokenOrChainIcon name="eurc" size={14} />
             <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               EURC
             </span>
@@ -58,6 +61,7 @@ export function MultiBalanceBar({ usdcBalance, eurcBalance, nativeBalance, addre
         <div style={{ width: 1, height: 40, background: 'var(--border-primary)' }} />
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+            <TokenOrChainIcon name="arc" size={14} />
             <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               Native (Gas)
             </span>

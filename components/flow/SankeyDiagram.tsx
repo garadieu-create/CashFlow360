@@ -182,7 +182,7 @@ export default function SankeyDiagram({ transactions }: { transactions: Transact
         rect.setAttribute('y', String(pos.y));
         rect.setAttribute('width', String(nodeWidth));
         rect.setAttribute('height', String(Math.max(8, pos.h)));
-        rect.setAttribute('rx', '4');
+        rect.setAttribute('rx', '0');
         rect.setAttribute('fill', node.color);
         rect.setAttribute('fill-opacity', '0.9');
         rect.setAttribute('class', 'sankey-node');

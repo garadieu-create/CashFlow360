@@ -32,7 +32,7 @@ export default function SendContent() {
   const [category, setCategory] = useState('Operations');
 
   const { transfer, data: txHash, isPending, error, reset } = useVaultOperations();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash || undefined });
 
   const { openModal, updateModal, closeModal, triggerGlobalError } = useModal();
   const modalIdRef = useRef<string | null>(null);

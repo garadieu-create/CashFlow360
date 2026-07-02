@@ -86,6 +86,7 @@ async function queryDb(sql: string, params: any[] = []): Promise<any[]> {
   await ensureDatabaseInitialized();
   return new Promise((resolve, reject) => {
     const db = new sqlite3.Database(DB_PATH);
+    db.configure("busyTimeout", 10000);
     db.all(sql, params, (err, rows) => {
       db.close();
       if (err) reject(err);
@@ -98,6 +99,7 @@ async function runDb(sql: string, params: any[] = []): Promise<void> {
   await ensureDatabaseInitialized();
   return new Promise((resolve, reject) => {
     const db = new sqlite3.Database(DB_PATH);
+    db.configure("busyTimeout", 10000);
     db.run(sql, params, (err) => {
       db.close();
       if (err) reject(err);
@@ -105,6 +107,8 @@ async function runDb(sql: string, params: any[] = []): Promise<void> {
     });
   });
 }
+
+let cachedAuthStatus: { isAuthenticated: boolean; agentWalletAddress?: string; timestamp: number } | null = null;
 
 export async function GET(req: NextRequest) {
   try {
@@ -115,37 +119,54 @@ export async function GET(req: NextRequest) {
       settingsMap[row.key] = row.value;
     });
 
-    // Check auth status by running npx circle wallet status
+    // Check auth status by running npx circle wallet status (cached for 30s)
     let isAuthenticated = false;
-    try {
-      const { execFileSync } = require('child_process');
-      const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-      const statusOutput = execFileSync(
-        npxCmd,
-        ['circle', 'wallet', 'status'],
-        { 
-          encoding: 'utf8',
-          env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
-        }
-      );
-      if (
-        statusOutput.toLowerCase().includes('authenticated') || 
-        statusOutput.toLowerCase().includes('agent') || 
-        statusOutput.toLowerCase().includes('wallet')
-      ) {
-        isAuthenticated = true;
-        
-        // Try to parse the real agent wallet address from output
-        const addressMatch = statusOutput.match(/(0x[a-fA-F0-9]{40})/);
-        if (addressMatch && addressMatch[1]) {
-          const liveAddress = addressMatch[1];
-          await runDb(`INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('agent_wallet_address', ?, ?)`, [liveAddress, Date.now()]);
-          settingsMap.agent_wallet_address = liveAddress;
-        }
+    let agentAddress = settingsMap.agent_wallet_address || '0xfb5FEeDA927C63AF2Dd87c81F53eBF6b58512F7b';
+    const now = Date.now();
+
+    if (cachedAuthStatus && (now - cachedAuthStatus.timestamp < 30000)) {
+      isAuthenticated = cachedAuthStatus.isAuthenticated;
+      if (cachedAuthStatus.agentWalletAddress) {
+        agentAddress = cachedAuthStatus.agentWalletAddress;
+        settingsMap.agent_wallet_address = agentAddress;
       }
-    } catch (e: any) {
-      const sessionRows = await queryDb(`SELECT value FROM session_tokens WHERE key = 'session_token'`);
-      isAuthenticated = sessionRows.length > 0;
+    } else {
+      try {
+        const { execFileSync } = require('child_process');
+        const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+        const statusOutput = execFileSync(
+          npxCmd,
+          ['circle', 'wallet', 'status'],
+          { 
+            encoding: 'utf8',
+            env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' },
+            shell: true,
+            stdio: ['pipe', 'pipe', 'pipe'],
+            timeout: 10000
+          }
+        );
+        if (
+          statusOutput.toLowerCase().includes('authenticated') || 
+          statusOutput.toLowerCase().includes('agent') || 
+          statusOutput.toLowerCase().includes('wallet')
+        ) {
+          isAuthenticated = true;
+          
+          // Try to parse the real agent wallet address from output
+          const addressMatch = statusOutput.match(/(0x[a-fA-F0-9]{40})/);
+          if (addressMatch && addressMatch[1]) {
+            agentAddress = addressMatch[1];
+            await runDb(`INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('agent_wallet_address', ?, ?)`, [agentAddress, Date.now()]);
+            settingsMap.agent_wallet_address = agentAddress;
+          }
+        }
+        cachedAuthStatus = { isAuthenticated, agentWalletAddress: agentAddress, timestamp: now };
+      } catch (e: any) {
+        // Circle CLI not logged in or not installed — fall back silently to DB session check
+        const sessionRows = await queryDb(`SELECT value FROM session_tokens WHERE key = 'session_token'`);
+        isAuthenticated = sessionRows.length > 0;
+        cachedAuthStatus = { isAuthenticated, agentWalletAddress: agentAddress, timestamp: now };
+      }
     }
 
     // Fetch latest logs

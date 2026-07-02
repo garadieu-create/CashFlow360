@@ -276,8 +276,14 @@ export function AgentSettings() {
           {/* Form Settings */}
           <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
                 Runway Alert Threshold (Days)
+                <span className="tooltip-container">
+                  <span className="tooltip-trigger">?</span>
+                  <span className="tooltip-content">
+                    The minimum runway days before triggering security alerts and automated bridging mechanisms.
+                  </span>
+                </span>
               </label>
               <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 <input
@@ -297,25 +303,47 @@ export function AgentSettings() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
                   Daily Spend Limit (USDC)
+                  <span className="tooltip-container">
+                    <span className="tooltip-trigger">?</span>
+                    <span className="tooltip-content">
+                      The maximum value of transaction volume the autonomous agent can execute per day.
+                    </span>
+                  </span>
                 </label>
                 <input
                   type="number"
-                  className="form-control"
-                  style={{ padding: '8px 12px', fontSize: 13 }}
+                  className="input input-mono"
+                  placeholder="0.00 (e.g. 5000.00)"
+                  style={{ fontSize: 13 }}
                   value={settings.spendingLimitDaily}
                   onChange={(e) => setSettings({ ...settings, spendingLimitDaily: parseFloat(e.target.value) })}
                 />
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
                   Agent Mode
+                  <span className="tooltip-container">
+                    <span className="tooltip-trigger">?</span>
+                    <span className="tooltip-content">
+                      Simulation mode runs client-side modeling; Live mode routes actual USDC transfers via the Circle CLI agent wallet.
+                    </span>
+                  </span>
                 </label>
                 <select
-                  className="form-control"
-                  style={{ padding: '8px 12px', fontSize: 13, background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)' }}
+                  className="input input-mono"
+                  style={{ 
+                    fontSize: 13, 
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 12px center',
+                    backgroundSize: '16px',
+                    paddingRight: '40px'
+                  }}
                   value={settings.mode}
                   onChange={(e) => setSettings({ ...settings, mode: e.target.value })}
                 >
@@ -364,43 +392,65 @@ export function AgentSettings() {
               </div>
 
               {!showOtp ? (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    type="email"
-                    placeholder="agent-email@domain.com"
-                    className="form-control"
-                    style={{ flex: 1, padding: '8px 12px', fontSize: 12 }}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                  <button 
-                    type="button" 
-                    className="btn btn-primary btn-sm"
-                    onClick={handleSendOtp}
-                    disabled={authenticating}
-                  >
-                    Request OTP
-                  </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    Agent Email Address
+                    <span className="tooltip-container">
+                      <span className="tooltip-trigger">?</span>
+                      <span className="tooltip-content">
+                        Enter the registered email associated with your Circle agent wallet.
+                      </span>
+                    </span>
+                  </label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="email"
+                      placeholder="agent-email@domain.com (e.g. dev-agent@company.com)"
+                      className="input input-mono"
+                      style={{ flex: 1, fontSize: 12 }}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                    <button 
+                      type="button" 
+                      className="btn btn-primary btn-sm"
+                      onClick={handleSendOtp}
+                      disabled={authenticating}
+                    >
+                      Request OTP
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    placeholder="Enter 6-digit OTP"
-                    className="form-control"
-                    style={{ flex: 1, padding: '8px 12px', fontSize: 12, textAlign: 'center', letterSpacing: '0.2em' }}
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value)}
-                  />
-                  <button 
-                    type="button" 
-                    className="btn btn-primary btn-sm"
-                    onClick={handleVerifyOtp}
-                    disabled={authenticating}
-                  >
-                    Verify & Mount
-                  </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    Verification Code (OTP)
+                    <span className="tooltip-container">
+                      <span className="tooltip-trigger">?</span>
+                      <span className="tooltip-content">
+                        Enter the 6-digit confirmation code sent to your email inbox.
+                      </span>
+                    </span>
+                  </label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      placeholder="123456 (6-digit OTP)"
+                      className="input input-mono"
+                      style={{ flex: 1, fontSize: 12, textAlign: 'center', letterSpacing: '0.2em' }}
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value)}
+                    />
+                    <button 
+                      type="button" 
+                      className="btn btn-primary btn-sm"
+                      onClick={handleVerifyOtp}
+                      disabled={authenticating}
+                    >
+                      Verify & Mount
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

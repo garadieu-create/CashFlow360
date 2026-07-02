@@ -12,6 +12,7 @@ function runDb(sql: string, params: any[] = []): Promise<void> {
       fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
     }
     const db = new sqlite3.Database(DB_PATH);
+    db.configure("busyTimeout", 10000);
     db.run(sql, params, (err) => {
       db.close();
       if (err) reject(err);
@@ -39,7 +40,8 @@ export async function POST(req: NextRequest) {
           ['circle', 'wallet', 'login', email, '--type', 'agent', '--init'],
           { 
             encoding: 'utf8',
-            env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+            env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' },
+            shell: true
           }
         );
         console.log(initOutput);
@@ -82,7 +84,8 @@ export async function POST(req: NextRequest) {
           ['circle', 'wallet', 'login', '--type', 'agent', '--request', requestId, '--otp', otp],
           { 
             encoding: 'utf8',
-            env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+            env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' },
+            shell: true
           }
         );
         console.log(verifyOutput);
@@ -93,7 +96,8 @@ export async function POST(req: NextRequest) {
           ['circle', 'wallet', 'status'],
           { 
             encoding: 'utf8',
-            env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+            env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' },
+            shell: true
           }
         );
         console.log("Status check:", statusOutput);

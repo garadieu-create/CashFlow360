@@ -38,6 +38,7 @@ if (!fs.existsSync(AGENT_DIR)) {
 }
 
 const db = new sqlite3.Database(DB_PATH);
+db.configure("busyTimeout", 10000);
 
 // Initialize SQLite Database
 function initDatabase(): Promise<void> {
@@ -161,7 +162,8 @@ async function handleLogin(email: string) {
       ['circle', 'wallet', 'login', email, '--type', 'agent', '--init'],
       { 
         encoding: 'utf8',
-        env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+        env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' },
+        shell: true
       }
     );
     console.log(initOutput);
@@ -203,7 +205,8 @@ async function handleLogin(email: string) {
       ['circle', 'wallet', 'login', '--type', 'agent', '--request', requestId, '--otp', otp],
       { 
         encoding: 'utf8',
-        env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+        env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' },
+        shell: true
       }
     );
     console.log(confirmOutput);
@@ -214,7 +217,8 @@ async function handleLogin(email: string) {
       ['circle', 'wallet', 'status'],
       { 
         encoding: 'utf8',
-        env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+        env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' },
+        shell: true
       }
     );
     await logToDb(`Circle CLI session verified: ${statusOutput.trim()}`, 'SUCCESS');
@@ -385,7 +389,8 @@ async function monitorRunwayAndRebalance() {
               ],
               { 
                 stdio: 'inherit',
-                env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' }
+                env: { ...process.env, CIRCLE_ACCEPT_TERMS: '1' },
+                shell: true
               }
             );
             await logToDb(`Bridge transaction submitted via CCTP successfully.`, 'SUCCESS');

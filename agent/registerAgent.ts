@@ -6,6 +6,7 @@ import { arcTestnet } from '../lib/arc-config';
 
 const DB_PATH = path.join(__dirname, 'agent.db');
 const db = new sqlite3.Database(DB_PATH);
+db.configure("busyTimeout", 10000);
 
 function runDb(sql: string, params: any[] = []): Promise<void> {
   return new Promise((resolve, reject) => {

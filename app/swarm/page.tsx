@@ -34,6 +34,7 @@ export default function SwarmPage() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [triggerRebalance, setTriggerRebalance] = useState(false);
   const [mode, setMode] = useState<'simulation' | 'live'>('live');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeTab, setActiveTab] = useState<'visual' | 'logs'>('visual');
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
@@ -45,6 +46,7 @@ export default function SwarmPage() {
       if (data.success) {
         setLogs(data.logs || []);
         setMode(data.settings?.mode || 'live');
+        setIsAuthenticated(data.settings?.isAuthenticated || false);
       }
     } catch (err) {
       console.error('Failed to load agent logs', err);
@@ -77,6 +79,7 @@ export default function SwarmPage() {
       const data = await res.json();
       if (data.success) {
         toast.success(triggerRebalance ? 'Swarm Rebalanced Successfully!' : 'Swarm Runway Analysis Clean!', { id: toastId });
+        window.dispatchEvent(new Event('swarm-cycle-triggered'));
         fetchState();
       } else {
         toast.error('Swarm simulation cycle failed', { id: toastId });
@@ -134,6 +137,7 @@ export default function SwarmPage() {
                 </span>
               </div>
               <LoadingButton 
+                id="run-swarm-btn"
                 variant="primary" 
                 style={{ width: '100%' }}
                 onClick={handleRunSwarm}
@@ -152,10 +156,17 @@ export default function SwarmPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                   <Sliders size={18} style={{ color: 'var(--ph-red)' }} />
                   <span style={{ fontSize: 13, fontWeight: 800 }}>REBALANCE SETTING</span>
+                  <span className="tooltip-container">
+                    <span className="tooltip-trigger">?</span>
+                    <span className="tooltip-content">
+                      Configure autonomous rebalancing triggers for the agent swarm logic.
+                    </span>
+                  </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                     <input 
+                      id="force-rebalance-checkbox"
                       type="checkbox" 
                       checked={triggerRebalance} 
                       onChange={(e) => setTriggerRebalance(e.target.checked)}
@@ -176,14 +187,20 @@ export default function SwarmPage() {
                   <Activity size={18} style={{ color: 'var(--ph-blue)' }} />
                   <span style={{ fontSize: 13, fontWeight: 800 }}>SWARM HEALTH</span>
                 </div>
-                <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   <div>
-                    <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'var(--font-mono)' }}>4 / 4</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>Agents Active</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'var(--font-mono)' }}>4 / 4</div>
+                    <div style={{ fontSize: 9, color: 'var(--text-secondary)' }}>Agents Active</div>
                   </div>
                   <div style={{ borderLeft: '1px solid var(--border-primary)', paddingLeft: 12 }}>
-                    <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--ph-green)' }}>100%</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>Consensus</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--ph-green)' }}>100%</div>
+                    <div style={{ fontSize: 9, color: 'var(--text-secondary)' }}>Consensus</div>
+                  </div>
+                  <div style={{ borderLeft: '1px solid var(--border-primary)', paddingLeft: 12 }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'var(--font-mono)', color: isAuthenticated ? 'var(--ph-green)' : 'var(--ph-yellow)' }}>
+                      {isAuthenticated ? 'Active' : 'Missing'}
+                    </div>
+                    <div style={{ fontSize: 9, color: 'var(--text-secondary)' }}>CLI Wallet</div>
                   </div>
                 </div>
               </div>

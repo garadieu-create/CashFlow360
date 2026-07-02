@@ -580,6 +580,7 @@ export default function BridgePage() {
 
       addSwapLog(`Requesting user wallet EIP-712 signature for Permit2 transfer...`);
       const signature = await signTypedDataAsync({
+        account: address,
         domain,
         types,
         primaryType: 'PermitTransferFrom',

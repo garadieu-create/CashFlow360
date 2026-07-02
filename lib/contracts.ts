@@ -262,7 +262,7 @@ export const USDC_ABI = [
   },
 ] as const;
 
-export const PAYROLL_JOB_ADDRESS = '0xdF35E1700Ec6a735160E360eB73Cb5779cCeC66A' as const;
+export const PAYROLL_JOB_ADDRESS = '0xdf35E1700ec6a735160E360eb73Cb5779cCeC66a' as const;
 
 export const PAYROLL_JOB_ABI = [
   {

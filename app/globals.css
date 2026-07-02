@@ -97,8 +97,8 @@
 .brutalist-outline-title {
   font-family: var(--font-mono);
   font-weight: 800;
-  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.15);
-  color: transparent;
+  -webkit-text-stroke: 1px var(--text-primary);
+  color: var(--text-primary);
   text-transform: uppercase;
   letter-spacing: -0.04em;
 }
@@ -160,10 +160,9 @@ a:hover {
 .app-layout {
   display: flex;
   min-height: 100vh;
-  border-left: 1px solid var(--border-primary);
-  border-right: 1px solid var(--border-primary);
-  max-width: 1600px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
   background: var(--bg-primary);
 }
 
@@ -181,7 +180,6 @@ a:hover {
 }
 
 .app-main {
-  margin-left: var(--sidebar-width);
   flex: 1;
   min-height: 100vh;
   display: flex;
@@ -920,12 +918,14 @@ a:hover {
 
 .sankey-node rect {
   fill-opacity: 0.9;
-  stroke: none;
-  transition: fill-opacity var(--transition-fast);
+  stroke: var(--text-primary);
+  stroke-width: 2px;
+  transition: fill-opacity var(--transition-fast), stroke-width var(--transition-fast);
 }
 
 .sankey-node rect:hover {
   fill-opacity: 1;
+  stroke-width: 3px;
 }
 
 .sankey-link {
@@ -1040,6 +1040,12 @@ a:hover {
 .scenario-slider {
   width: 100%;
   accent-color: var(--ph-red);
+}
+
+.grid-3-1 {
+  display: grid;
+  grid-template-columns: 2.2fr 1fr;
+  gap: var(--space-lg);
 }
 
 /* === Responsive === */
@@ -1469,6 +1475,76 @@ input:focus-visible {
   .premium-spinner {
     animation-duration: 2s !important;
   }
+}
+
+/* === Brutalist Tooltip System === */
+.tooltip-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  cursor: help;
+}
+
+.tooltip-trigger {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--text-primary);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.tooltip-container:hover .tooltip-trigger {
+  background: var(--ph-red);
+  color: white;
+  border-color: var(--text-primary);
+}
+
+.tooltip-content {
+  visibility: hidden;
+  opacity: 0;
+  width: 220px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  text-align: left;
+  border: 2px solid var(--text-primary);
+  padding: 8px 12px;
+  position: absolute;
+  z-index: 1000;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.95);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: normal;
+  pointer-events: none;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+
+.tooltip-content::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: var(--text-primary) transparent transparent transparent;
+}
+
+.tooltip-container:hover .tooltip-content,
+.tooltip-container:focus-within .tooltip-content {
+  visibility: visible;
+  opacity: 1;
 }
 
 

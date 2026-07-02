@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { createPublicClient, http, parseEther, formatUnits, parseUnits, Hex } from 'viem';
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
-import { createBundlerClient } from 'viem/account-abstraction';
+import { createBundlerClient, toWebAuthnAccount } from 'viem/account-abstraction';
 import { 
   toCircleSmartAccount, 
   toModularTransport, 
@@ -15,6 +15,7 @@ import { arcTestnet } from '@/lib/arc-config';
 import { sepolia, baseSepolia, arbitrumSepolia } from 'viem/chains';
 import toast from 'react-hot-toast';
 import { Shield, Sparkles, Key, Mail, RefreshCw, LogOut, Info } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface CircleWalletContextType {
   address: `0x${string}` | null;
@@ -50,6 +51,26 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
   const [isLastTxSponsored, setIsLastTxSponsored] = useState(false);
   const [gasSponsoredCount, setGasSponsoredCount] = useState(0);
 
+  // Circle User PIN States
+  const [pinWalletId, setPinWalletId] = useState<string | null>(null);
+  const [pinCredentials, setPinCredentials] = useState<{ userToken: string; encryptionKey: string; appId?: string } | null>(null);
+  const [pinChallengeId, setPinChallengeId] = useState<string | null>(null);
+  const [isChallengeActive, setIsChallengeActive] = useState(false);
+
+  // Confetti trigger helper
+  const triggerConfetti = async () => {
+    try {
+      const confetti = (await import('canvas-confetti')).default;
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.6 }
+      });
+    } catch (e) {
+      console.warn('Failed to fire confetti effect:', e);
+    }
+  };
+
   // Onboarding overlay states
   const [showOverlay, setShowOverlay] = useState(false);
   const [activeTab, setActiveTab] = useState<'passkey' | 'email'>('passkey');
@@ -58,46 +79,130 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
   const [otpInput, setOtpInput] = useState('');
   const [otpSent, setOtpSent] = useState(false);
 
-  // Initialize public client for Arc Testnet
-  const publicClient = createPublicClient({
+  // Circle Modular Transport — created lazily only when toCircleSmartAccount needs it.
+  // Eager creation causes viem to make RPC init calls through Circle's SDK endpoint on page load,
+  // triggering "Cannot find entity config" errors before any user action.
+  const clientUrl = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL || 'https://modular-sdk.circle.com/v1/rpc/w3s/buidl';
+  const clientKey = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_KEY || process.env.NEXT_PUBLIC_CIRCLE_KIT_KEY || '';
+
+  const getModularClient = () => createPublicClient({
     chain: arcTestnet,
-    transport: http('https://rpc.testnet.arc.network')
+    transport: toModularTransport(`${clientUrl}/arcTestnet`, clientKey)
   });
 
-  // Restore session from localStorage on mount
+  // Get Circle Web SDK instance dynamically to prevent SSR errors
+  const getW3SSdk = async (appId: string) => {
+    const { W3SSdk } = await import('@circle-fin/w3s-pw-web-sdk');
+    const finalAppId = appId || process.env.NEXT_PUBLIC_CIRCLE_APP_ID || '';
+    console.log('[Circle W3SSdk] Initializing with appId:', finalAppId || '(EMPTY — will cause error 155114!)');
+    if (!finalAppId) {
+      console.error('[Circle W3SSdk] CRITICAL: No appId available! Set NEXT_PUBLIC_CIRCLE_APP_ID in .env');
+    }
+    return new W3SSdk({ appSettings: { appId: finalAppId } });
+  };
+
+  // Restore session from localStorage on mount & Intercept WebAuthn RP ID on localhost
   useEffect(() => {
+    // Intercept WebAuthn RP ID on localhost to avoid credential creation errors
+    if (typeof window !== 'undefined' && window.navigator?.credentials) {
+      const originalCreate = window.navigator.credentials.create.bind(window.navigator.credentials);
+      window.navigator.credentials.create = async function (options: any) {
+        if (options?.publicKey?.rp?.id) {
+          options.publicKey.rp.id = window.location.hostname;
+        }
+        if (options?.publicKey?.authenticatorSelection?.authenticatorAttachment === 'platform') {
+          delete options.publicKey.authenticatorSelection.authenticatorAttachment;
+        }
+        return originalCreate(options);
+      };
+
+      const originalGet = window.navigator.credentials.get.bind(window.navigator.credentials);
+      window.navigator.credentials.get = async function (options: any) {
+        if (options?.publicKey?.rpId) {
+          options.publicKey.rpId = window.location.hostname;
+        }
+        if (options?.publicKey?.rp?.id) {
+          options.publicKey.rp.id = window.location.hostname;
+        }
+        return originalGet(options);
+      };
+    }
+
     const restoreSession = async () => {
       const saved = sessionStorage.getItem('circle_smart_account_session');
       if (saved) {
         try {
           setIsLoading(true);
           const session = JSON.parse(saved);
-          if (session.ownerPrivateKey) {
-            const owner = privateKeyToAccount(session.ownerPrivateKey as `0x${string}`);
+          if (session.method === 'passkey' && session.credential) {
+            const owner = toWebAuthnAccount({ credential: session.credential });
             const account = await toCircleSmartAccount({
-              client: publicClient,
+              client: getModularClient(),
               owner,
-              name: session.username || session.email || 'CashFlow360 User'
+              name: session.username || 'CashFlow360 User'
             });
             setSmartAccount(account);
             setAddress(account.address as `0x${string}`);
             setIsConnected(true);
-            setSocialEmail(session.email || null);
-            if (session.email) setSocialEmail(session.email);
+            setSocialEmail(session.username || null);
+          } else if (session.method === 'pin') {
+            setAddress(session.address);
+            setSocialEmail(session.socialEmail);
+            setPinCredentials({
+              userToken: session.userToken,
+              encryptionKey: session.encryptionKey,
+              appId: session.appId
+            });
+            setPinWalletId(session.walletId);
+            setIsConnected(true);
           }
         } catch (e) {
-          console.error('Failed to restore Circle smart account session:', e);
+          console.warn('Circle session restore failed — clearing stale session:', (e as any)?.shortMessage || (e as any)?.message);
           sessionStorage.removeItem('circle_smart_account_session');
+          setShowOverlay(true);
         } finally {
           setIsLoading(false);
         }
       } else {
-        // If no session exists, force the onboarding overlay
         setShowOverlay(true);
       }
     };
     restoreSession();
   }, []);
+
+  const fetchWallets = async (userToken: string, encryptionKey: string, appId: string, userId: string) => {
+    const res = await fetch('/api/wallet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'list-wallets', userToken })
+    });
+    const data = await res.json();
+    if (data.success && data.wallets && data.wallets.length > 0) {
+      const wallet = data.wallets.find((w: any) => w.blockchain === 'arc-testnet') || data.wallets[0];
+      const address = wallet.address;
+      const walletId = wallet.id;
+
+      // Save session
+      sessionStorage.setItem('circle_smart_account_session', JSON.stringify({
+        method: 'pin',
+        address,
+        socialEmail: userId,
+        userToken,
+        encryptionKey,
+        walletId,
+        appId
+      }));
+
+      setAddress(address as `0x${string}`);
+      setSocialEmail(userId);
+      setPinCredentials({ userToken, encryptionKey, appId });
+      setPinWalletId(walletId);
+      setIsConnected(true);
+      setShowOverlay(false);
+    } else {
+      throw new Error(data.error || 'No wallets found. Please initialize first.');
+    }
+  };
 
   const loginWithPasskey = async (user: string) => {
     if (!user) {
@@ -107,44 +212,61 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
     setIsLoading(true);
     const toastId = toast.loading('Initializing biometric WebAuthn prompt...');
     try {
-      // Create passkey transport
-      const clientUrl = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL || 'https://api.circle.com/v1/w3s/modular-wallets';
-      const clientKey = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_KEY || process.env.NEXT_PUBLIC_CIRCLE_KIT_KEY || 'sandbox_kit_key_placeholder';
-      
       const passkeyTransport = toPasskeyTransport(clientUrl, clientKey);
       
+      let credentialJson = localStorage.getItem(`circle_credential_${user}`);
       let credential;
-      try {
+      
+      if (credentialJson) {
+        try {
+          credential = JSON.parse(credentialJson);
+          toast.loading('Loading saved passkey credential...', { id: toastId });
+        } catch (e) {
+          localStorage.removeItem(`circle_credential_${user}`);
+        }
+      }
+
+      if (!credential) {
+        // Register a new WebAuthn credential
         credential = await toWebAuthnCredential({
           transport: passkeyTransport,
           mode: WebAuthnMode.Register,
           username: user
         });
-        toast.loading('Deriving Smart Account owner from passkey...', { id: toastId });
-      } catch (err: any) {
-        console.warn('WebAuthn biometrics not supported or cancelled. Falling back to secure device key.', err);
-        // Fallback: Generate a secure deterministic private key for the user
-        // In production, we'd persist the derived credential, but locally/sandbox EOA private key works perfectly
+        localStorage.setItem(`circle_credential_${user}`, JSON.stringify(credential));
+      } else {
+        // Attempt login WebAuthn credential
+        try {
+          credential = await toWebAuthnCredential({
+            transport: passkeyTransport,
+            mode: WebAuthnMode.Login
+          });
+        } catch (err) {
+          console.warn('Login credential failed, attempting registration fallback...', err);
+          credential = await toWebAuthnCredential({
+            transport: passkeyTransport,
+            mode: WebAuthnMode.Register,
+            username: user
+          });
+          localStorage.setItem(`circle_credential_${user}`, JSON.stringify(credential));
+        }
       }
 
-      // Generate a secure private key to act as the LocalAccount owner
-      // We derive it deterministically from username + salt for session stability across reloads
-      // or generate a new random key and save it.
-      const localKey = generatePrivateKey();
-      const owner = privateKeyToAccount(localKey);
+      toast.loading('Deriving Smart Account owner from passkey...', { id: toastId });
+      const owner = toWebAuthnAccount({ credential });
 
       const account = await toCircleSmartAccount({
-        client: publicClient,
+        client: getModularClient(),
         owner,
         name: user
       });
 
       // Save session
       sessionStorage.setItem('circle_smart_account_session', JSON.stringify({
-        ownerPrivateKey: localKey,
+        method: 'passkey',
+        credential,
         smartAccountAddress: account.address,
-        username: user,
-        method: 'passkey'
+        username: user
       }));
 
       setSmartAccount(account);
@@ -161,61 +283,111 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
   };
 
   const sendEmailOtp = async (email: string) => {
-    if (!email || !email.includes('@')) {
-      toast.error('Please enter a valid email address');
+    if (!email || email.length < 5) {
+      toast.error('Please enter a username or identifier (min 5 characters)');
       return;
     }
     setIsLoading(true);
-    const toastId = toast.loading('Sending verification code...');
+    const toastId = toast.loading('Connecting to Circle PIN infrastructure...');
     try {
-      // Simulate sending OTP via Circle OTP
-      await new Promise(r => setTimeout(r, 1500));
-      setOtpSent(true);
-      toast.success('Verification code sent to your email!', { id: toastId });
+      // 1. Create user in Circle's system
+      const createRes = await fetch('/api/wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create-user', userId: email })
+      });
+      const createData = await createRes.json();
+      if (!createRes.ok) {
+        throw new Error(createData.error || 'Failed to sync user with Circle');
+      }
+
+      // 2. Retrieve user session token
+      const tokenRes = await fetch('/api/wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-token', userId: email })
+      });
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok) {
+        throw new Error(tokenData.error || 'Failed to get user session token');
+      }
+
+      const { userToken, encryptionKey, appId } = tokenData;
+
+      // 3. Initialize PIN and create wallet
+      const initRes = await fetch('/api/wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'initialize', userToken })
+      });
+      const initData = await initRes.json();
+
+      if (!initRes.ok) {
+        throw new Error(initData.error || 'Failed to initialize PIN challenge');
+      }
+
+      if (initData.code === 155106) {
+        // Already initialized, directly fetch wallets
+        toast.loading('Fetching existing wallets...', { id: toastId });
+        await fetchWallets(userToken, encryptionKey, appId, email);
+        toast.success('Successfully restored PIN wallet session!', { id: toastId });
+      } else if (initData.challengeId) {
+        // Needs PIN Setup
+        setPinChallengeId(initData.challengeId);
+        setPinCredentials({ userToken, encryptionKey, appId });
+        setOtpSent(true);
+        toast.success('Ready to secure wallet with PIN. Click below to proceed.', { id: toastId });
+      } else {
+        throw new Error('Unknown initialization state');
+      }
     } catch (e: any) {
-      toast.error('Failed to send OTP code', { id: toastId });
+      console.error(e);
+      toast.error(e.message || 'Failed to connect PIN wallet', { id: toastId });
     } finally {
       setIsLoading(false);
     }
   };
 
   const loginWithEmail = async (email: string, otp: string) => {
-    if (!otp || otp.length < 6) {
-      toast.error('Please enter a valid 6-digit code');
+    if (!pinChallengeId || !pinCredentials) {
+      toast.error('PIN challenge not loaded. Please connect first.');
       return;
     }
+
     setIsLoading(true);
-    const toastId = toast.loading('Verifying code & provisioning smart account...');
+    const toastId = toast.loading('Opening secure Circle PIN setup window...');
     try {
-      // Simulate OTP verification
-      await new Promise(r => setTimeout(r, 1800));
-
-      const localKey = generatePrivateKey();
-      const owner = privateKeyToAccount(localKey);
-
-      const account = await toCircleSmartAccount({
-        client: publicClient,
-        owner,
-        name: email
+      const sdk = await getW3SSdk(pinCredentials.appId || '');
+      sdk.setAuthentication({
+        userToken: pinCredentials.userToken,
+        encryptionKey: pinCredentials.encryptionKey
       });
 
-      // Save session
-      sessionStorage.setItem('circle_smart_account_session', JSON.stringify({
-        ownerPrivateKey: localKey,
-        smartAccountAddress: account.address,
-        email: email,
-        method: 'email'
-      }));
+      sdk.execute(pinChallengeId, (error, result) => {
+        if (error) {
+          console.error('[Circle PIN Error]:', error);
+          toast.error(error.message || 'PIN setup failed', { id: toastId });
+          setIsLoading(false);
+          return;
+        }
 
-      setSmartAccount(account);
-      setAddress(account.address as `0x${string}`);
-      setIsConnected(true);
-      setSocialEmail(email);
-      setShowOverlay(false);
-      toast.success('Successfully logged in!', { id: toastId });
+        console.log('[Circle PIN Success]:', result);
+        toast.loading('Deploying user smart account...', { id: toastId });
+
+        fetchWallets(pinCredentials.userToken, pinCredentials.encryptionKey, pinCredentials.appId || '', email)
+          .then(() => {
+            toast.success('Wallet created and synchronized successfully!', { id: toastId });
+          })
+          .catch((err: any) => {
+            toast.error(err.message || 'Failed to list created wallets', { id: toastId });
+          })
+          .finally(() => {
+            setIsLoading(false);
+          });
+      });
     } catch (e: any) {
-      toast.error('Invalid verification code', { id: toastId });
-    } finally {
+      console.error(e);
+      toast.error(e.message || 'Failed to start PIN window', { id: toastId });
       setIsLoading(false);
     }
   };
@@ -230,6 +402,9 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
     setEmailInput('');
     setOtpInput('');
     setUsername('');
+    setPinWalletId(null);
+    setPinCredentials(null);
+    setPinChallengeId(null);
     setShowOverlay(true);
     toast.success('Disconnected session successfully.');
   };
@@ -241,7 +416,7 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
     return { name: 'arcTestnet', chain: arcTestnet };
   };
 
-  // Gasless Contract Writer
+  // Gasless Contract Writer (Dual-mode support for WebAuthn smart account & User-Controlled PIN wallets)
   const executeContractWrite = async (
     contractAddress: `0x${string}`,
     abi: any,
@@ -249,6 +424,71 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
     args: any[],
     chainId?: number
   ): Promise<`0x${string}`> => {
+    // 1. PIN Wallet execution flow (Challenge-response with User-Controlled Web SDK)
+    if (pinCredentials && pinWalletId) {
+      const toastId = toast.loading('Initiating contract execution challenge...');
+      setIsLastTxSponsored(false);
+      try {
+        const { encodeFunctionData } = await import('viem');
+        const callData = encodeFunctionData({
+          abi,
+          functionName,
+          args
+        });
+
+        toast.loading('Requesting signature authorization...', { id: toastId });
+        const res = await fetch('/api/wallet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'execute-contract',
+            userToken: pinCredentials.userToken,
+            walletId: pinWalletId,
+            contractAddress,
+            callData
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Failed to generate contract execution challenge');
+        }
+
+        toast.loading('Opening secure PIN prompt...', { id: toastId });
+        const sdk = await getW3SSdk(pinCredentials.appId || '');
+        sdk.setAuthentication({
+          userToken: pinCredentials.userToken,
+          encryptionKey: pinCredentials.encryptionKey
+        });
+
+        setIsChallengeActive(true);
+
+        return new Promise<`0x${string}`>((resolve, reject) => {
+          sdk.execute(data.challengeId, (error, result) => {
+            setIsChallengeActive(false);
+            if (error) {
+              console.error('[Circle PIN Tx Error]:', error);
+              toast.error(error.message || 'Transaction authorization failed', { id: toastId });
+              reject(error);
+              return;
+            }
+            console.log('[Circle PIN Tx Success]:', result);
+            setIsLastTxSponsored(true);
+            setGasSponsoredCount(prev => prev + 1);
+            toast.success('Transaction submitted to blockchain!', { id: toastId });
+            triggerConfetti();
+            resolve(((result as any)?.txHash || '0x') as `0x${string}`);
+          });
+        });
+      } catch (error: any) {
+        setIsChallengeActive(false);
+        console.error('PIN Contract execution failed:', error);
+        toast.error(error.message || 'Transaction failed', { id: toastId });
+        throw error;
+      }
+    }
+
+    // 2. Passkey / WebAuthn smart account execution flow
     if (!smartAccount) {
       throw new Error('Circle Smart Account is not initialized');
     }
@@ -259,10 +499,9 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
     setIsLastTxSponsored(false);
 
     try {
-      // 1. Prepare EIP-4337 Modular paymaster transport
-      const clientUrl = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL || 'https://api.circle.com/v1/w3s/modular-wallets';
+      const clientUrl = 'https://modular-sdk.circle.com/v1/rpc/w3s/buidl';
       const clientKey = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_KEY || process.env.NEXT_PUBLIC_CIRCLE_KIT_KEY || 'sandbox_kit_key_placeholder';
-      const modularTransport = toModularTransport(`${clientUrl}/${chainName}`, clientKey);
+      const modularTransport = toModularTransport(`${clientUrl}/arcTestnet`, clientKey);
 
       // Create bundler client
       const bundlerClient = createBundlerClient({
@@ -285,9 +524,35 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
         console.warn('Failed to encode function data:', e);
       }
 
-      // 2. Submit sponsored UserOperation
+      // Submit sponsored UserOperation
       let userOpHash: `0x${string}`;
+      let gasPrice = { maxPriorityFeePerGas: 15000000000n, maxFeePerGas: 60000000000n }; // Safe fallback
       try {
+        // Query dynamic gas prices
+        try {
+          const response = await fetch(`${clientUrl}/arcTestnet`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${clientKey}`
+            },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              method: 'circle_getUserOperationGasPrice'
+            })
+          });
+          const resData = await response.json();
+          if (resData?.result?.medium) {
+            gasPrice = {
+              maxPriorityFeePerGas: BigInt(resData.result.medium.maxPriorityFeePerGas),
+              maxFeePerGas: BigInt(resData.result.medium.maxFeePerGas)
+            };
+          }
+        } catch (e) {
+          console.warn('Fallback to standard gas values', e);
+        }
+
         userOpHash = await bundlerClient.sendUserOperation({
           account: smartAccount,
           calls: [{
@@ -295,37 +560,39 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
             value: 0n,
             data: callData,
           }],
-          paymaster: true // Requests gasless sponsorship from Circle
+          paymaster: true, // Requests gasless sponsorship from Circle
+          maxPriorityFeePerGas: gasPrice.maxPriorityFeePerGas,
+          maxFeePerGas: gasPrice.maxFeePerGas
         });
       } catch (err: any) {
-        console.warn('Sponsored bundler submission failed, falling back to direct smart account write:', err);
-        
-        const saved = sessionStorage.getItem('circle_smart_account_session');
-        const session = saved ? JSON.parse(saved) : null;
-        if (session && session.ownerPrivateKey) {
-          const { createWalletClient } = await import('viem');
-          const ownerAccount = privateKeyToAccount(session.ownerPrivateKey as `0x${string}`);
-          const walletClient = createWalletClient({
-            account: ownerAccount,
-            chain: targetChain,
-            transport: http(targetChain.rpcUrls.default.http[0])
+        console.warn('Sponsored bundler submission failed, retrying with boosted gas:', err);
+        toast.loading('Retrying with adjusted gas parameters...', { id: toastId });
+
+        // Retry with 2x boosted gas — handles underestimation & mempool congestion
+        try {
+          userOpHash = await bundlerClient.sendUserOperation({
+            account: smartAccount,
+            calls: [{
+              to: contractAddress,
+              value: 0n,
+              data: callData,
+            }],
+            paymaster: true,
+            maxPriorityFeePerGas: gasPrice.maxPriorityFeePerGas * 2n,
+            maxFeePerGas: gasPrice.maxFeePerGas * 2n
           });
-          const hash = await walletClient.sendTransaction({
-            to: contractAddress,
-            data: callData,
-            value: 0n,
-          });
-          setIsLastTxSponsored(false);
-          toast.success(`Transaction executed directly on-chain on ${targetChain.name}!`, { id: toastId });
-          return hash;
-        } else {
-          throw new Error('No owner private key found to execute fallback transaction');
+        } catch (retryErr: any) {
+          console.error('Retry also failed:', retryErr);
+          // Surface the original bundler error, not a misleading private-key message
+          const msg = err?.shortMessage || err?.message || retryErr?.message || 'Bundler UserOperation submission failed';
+          throw new Error(msg);
         }
       }
 
       setIsLastTxSponsored(true);
       setGasSponsoredCount(prev => prev + 1);
       toast.success(`Transaction executed with Circle Gasless Sponsorship on ${targetChain.name}!`, { id: toastId });
+      triggerConfetti();
       return userOpHash;
     } catch (error: any) {
       console.error('Contract execution failed:', error);
@@ -356,269 +623,375 @@ export function CircleWalletProvider({ children }: { children: React.ReactNode }
       {children}
 
       {/* Onboarding Overlay / Modal */}
-      {showOverlay && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(9, 11, 15, 0.82)',
-          backdropFilter: 'blur(12px)',
-          zIndex: 10000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 24,
-          fontFamily: 'Inter, sans-serif'
-        }}>
-          <div style={{
-            background: 'linear-gradient(145deg, #1A1C23 0%, #111217 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: 20,
-            maxWidth: 440,
-            width: '100%',
-            padding: 32,
-            boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
-            color: 'white'
-          }}>
-            {/* Header */}
-            <div style={{ textAlign: 'center', marginBottom: 28 }}>
-              <div style={{
-                width: 54,
-                height: 54,
-                borderRadius: '50%',
-                background: 'rgba(245, 78, 0, 0.1)',
-                border: '1px solid rgba(245, 78, 0, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px'
-              }}>
-                <Shield size={24} color="#F54E00" />
-              </div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 6 }}>
-                Initialize CashFlow360 Smart Account
-              </h2>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                Access gasless enterprise treasury powered by Circle
-              </p>
-            </div>
-
-            {/* Tab Selectors */}
-            <div style={{
+      <AnimatePresence>
+        {showOverlay && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(9, 11, 15, 0.85)',
+              backdropFilter: 'blur(8px)',
+              zIndex: 10000,
               display: 'flex',
-              background: '#0D0F14',
-              borderRadius: 10,
-              padding: 4,
-              marginBottom: 24,
-              border: '1px solid rgba(255,255,255,0.04)'
-            }}>
-              <button
-                onClick={() => setActiveTab('passkey')}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  border: 'none',
-                  background: activeTab === 'passkey' ? '#F54E00' : 'transparent',
-                  color: activeTab === 'passkey' ? 'white' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+              fontFamily: 'Inter, sans-serif'
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.96, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.96, y: 10 }}
+              transition={{ type: 'spring', duration: 0.4 }}
+              style={{
+                background: 'var(--bg-surface)',
+                border: '2px solid var(--text-primary)',
+                borderRadius: '0px',
+                maxWidth: 440,
+                width: '100%',
+                padding: 32,
+                boxShadow: '8px 8px 0px rgba(0,0,0,0.95)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              {/* Header */}
+              <div style={{ textAlign: 'center', marginBottom: 28 }}>
+                <div style={{
+                  width: 54,
+                  height: 54,
+                  borderRadius: '0px',
+                  background: 'rgba(245, 78, 0, 0.1)',
+                  border: '2px solid var(--text-primary)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 6
-                }}
-              >
-                <Key size={14} /> Passkey
-              </button>
-              <button
-                onClick={() => setActiveTab('email')}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  border: 'none',
-                  background: activeTab === 'email' ? '#F54E00' : 'transparent',
-                  color: activeTab === 'email' ? 'white' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6
-                }}
-              >
-                <Mail size={14} /> Email OTP
-              </button>
-            </div>
-
-            {/* Form Panels */}
-            {activeTab === 'passkey' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div className="input-group">
-                  <label className="input-label">Username or Identifier</label>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="e.g. alice.cashflow"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    disabled={isLoading}
-                    style={{ background: '#0D0F14', border: '1px solid var(--border-primary)' }}
-                  />
+                  margin: '0 auto 16px',
+                  boxShadow: '3px 3px 0px rgba(0,0,0,1)'
+                }}>
+                  <Shield size={24} color="#F54E00" />
                 </div>
+                <h2 style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 6, textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+                  Initialize Smart Account
+                </h2>
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                  Access gasless enterprise treasury powered by Circle
+                </p>
+              </div>
+
+              {/* Tab Selectors */}
+              <div style={{
+                display: 'flex',
+                background: 'var(--bg-secondary)',
+                borderRadius: '0px',
+                padding: 4,
+                marginBottom: 24,
+                border: '2px solid var(--text-primary)'
+              }}>
                 <button
-                  className="btn btn-primary"
-                  onClick={() => loginWithPasskey(username)}
-                  disabled={isLoading || !username}
+                  onClick={() => { setActiveTab('passkey'); setOtpSent(false); }}
                   style={{
-                    width: '100%',
-                    background: 'linear-gradient(90deg, #F54E00 0%, #FF6B00 100%)',
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '0px',
+                    fontSize: 13,
+                    fontWeight: 800,
                     border: 'none',
+                    background: activeTab === 'passkey' ? '#F54E00' : 'transparent',
+                    color: activeTab === 'passkey' ? 'white' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 8,
-                    height: 44,
-                    fontSize: 14,
-                    fontWeight: 700
+                    gap: 6
                   }}
                 >
-                  {isLoading ? (
-                    <>
-                      <RefreshCw size={16} className="spinning" /> Authenticating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={16} /> Connect with Biometrics
-                    </>
-                  )}
+                  <Key size={14} /> Passkey
+                </button>
+                <button
+                  onClick={() => { setActiveTab('email'); }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '0px',
+                    fontSize: 13,
+                    fontWeight: 800,
+                    border: 'none',
+                    background: activeTab === 'email' ? '#F54E00' : 'transparent',
+                    color: activeTab === 'email' ? 'white' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6
+                  }}
+                >
+                  <Mail size={14} /> Circle PIN
                 </button>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div className="input-group">
-                  <label className="input-label">Email Address</label>
-                  <input
-                    type="email"
-                    className="input"
-                    placeholder="name@company.com"
-                    value={emailInput}
-                    onChange={(e) => setEmailInput(e.target.value)}
-                    disabled={isLoading || otpSent}
-                    style={{ background: '#0D0F14', border: '1px solid var(--border-primary)' }}
-                  />
-                </div>
 
-                {otpSent && (
-                  <div className="input-group animate-enter">
-                    <label className="input-label">Verification Code (OTP)</label>
+              {/* Form Panels */}
+              {activeTab === 'passkey' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="input-group">
+                    <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                      Username or Identifier
+                      <span className="tooltip-container">
+                        <span className="tooltip-trigger">?</span>
+                        <span className="tooltip-content">
+                          Unique local identifier to register your biometric passkey.
+                        </span>
+                      </span>
+                    </label>
                     <input
                       type="text"
-                      className="input input-mono"
-                      placeholder="123456"
-                      maxLength={6}
-                      value={otpInput}
-                      onChange={(e) => setOtpInput(e.target.value)}
+                      className="input"
+                      placeholder="e.g. alice.cashflow"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
                       disabled={isLoading}
-                      style={{ textAlign: 'center', letterSpacing: 4, background: '#0D0F14', border: '1px solid var(--border-primary)' }}
+                      style={{ background: 'var(--bg-secondary)', border: '2px solid var(--text-primary)', borderRadius: '0px' }}
                     />
                   </div>
-                )}
-
-                {!otpSent ? (
                   <button
                     className="btn btn-primary"
-                    onClick={() => sendEmailOtp(emailInput)}
-                    disabled={isLoading || !emailInput}
+                    onClick={() => loginWithPasskey(username)}
+                    disabled={isLoading || !username}
                     style={{
                       width: '100%',
-                      background: 'linear-gradient(90deg, #F54E00 0%, #FF6B00 100%)',
-                      border: 'none',
+                      background: 'var(--ph-red)',
+                      border: '2px solid var(--text-primary)',
+                      boxShadow: '4px 4px 0px rgba(0,0,0,1)',
+                      borderRadius: '0px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
                       height: 44,
                       fontSize: 14,
-                      fontWeight: 700
+                      fontWeight: 800,
+                      color: 'white',
+                      cursor: 'pointer'
                     }}
                   >
-                    {isLoading ? <RefreshCw size={16} className="spinning" /> : 'Send OTP Code'}
+                    {isLoading ? (
+                      <>
+                        <RefreshCw size={16} className="spinning" /> Authenticating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={16} /> Connect with Biometrics
+                      </>
+                    )}
                   </button>
-                ) : (
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => loginWithEmail(emailInput, otpInput)}
-                    disabled={isLoading || !otpInput}
-                    style={{
-                      width: '100%',
-                      background: 'var(--ph-green)',
-                      border: 'none',
-                      height: 44,
-                      fontSize: 14,
-                      fontWeight: 700
-                    }}
-                  >
-                    {isLoading ? <RefreshCw size={16} className="spinning" /> : 'Verify & Log In'}
-                  </button>
-                )}
-              </div>
-            )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="input-group">
+                    <label className="input-label" style={{ display: 'flex', alignItems: 'center' }}>
+                      Email / User Identifier
+                      <span className="tooltip-container">
+                        <span className="tooltip-trigger">?</span>
+                        <span className="tooltip-content">
+                          Your email or unique user identifier to connect a non-custodial Circle PIN smart wallet.
+                        </span>
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="e.g. name@company.com or username"
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      disabled={isLoading || otpSent}
+                      style={{ background: 'var(--bg-secondary)', border: '2px solid var(--text-primary)', borderRadius: '0px' }}
+                    />
+                  </div>
 
-            {/* Explore as Guest Option */}
-            <button
-              onClick={() => setShowOverlay(false)}
-              style={{
-                marginTop: 16,
-                width: '100%',
-                background: 'transparent',
-                border: '1px dashed rgba(255,255,255,0.15)',
+                  {otpSent && (
+                    <div style={{ padding: 12, background: 'rgba(245, 78, 0, 0.08)', border: '2px dashed #F54E00', color: 'var(--text-primary)', fontSize: 13, textAlign: 'center', margin: '4px 0' }}>
+                      PIN setup initialized. Click below to enter your secure PIN in the Circle secure popup window.
+                    </div>
+                  )}
+
+                  {!otpSent ? (
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => sendEmailOtp(emailInput)}
+                      disabled={isLoading || !emailInput}
+                      style={{
+                        width: '100%',
+                        background: 'var(--ph-red)',
+                        border: '2px solid var(--text-primary)',
+                        boxShadow: '4px 4px 0px rgba(0,0,0,1)',
+                        borderRadius: '0px',
+                        height: 44,
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: 'white',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {isLoading ? <RefreshCw size={16} className="spinning" /> : 'Connect PIN Wallet'}
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => loginWithEmail(emailInput, '')}
+                      disabled={isLoading}
+                      style={{
+                        width: '100%',
+                        background: 'var(--ph-green)',
+                        border: '2px solid var(--text-primary)',
+                        boxShadow: '4px 4px 0px rgba(0,0,0,1)',
+                        borderRadius: '0px',
+                        height: 44,
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: 'black',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {isLoading ? <RefreshCw size={16} className="spinning" /> : 'Enter PIN & Initialize'}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Explore as Guest Option */}
+              <button
+                onClick={() => setShowOverlay(false)}
+                style={{
+                  marginTop: 16,
+                  width: '100%',
+                  background: 'transparent',
+                  border: '2px dashed var(--border-primary)',
+                  color: 'var(--text-primary)',
+                  height: 40,
+                  borderRadius: '0px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--ph-red)';
+                  e.currentTarget.style.color = 'var(--ph-red)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border-primary)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }}
+              >
+                Explore Platform (Guest Mode)
+              </button>
+
+              {/* Network Banner */}
+              <div style={{
+                marginTop: 20,
+                padding: 12,
+                background: 'var(--bg-secondary)',
+                borderRadius: '0px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 11,
                 color: 'var(--text-secondary)',
-                height: 40,
-                borderRadius: 10,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
+                border: '2px solid var(--text-primary)'
+              }}>
+                <Info size={14} color="#F54E00" />
+                <span>All smart account transactions are fully gas-sponsored on Arc Testnet.</span>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* PIN Challenge Active Overlay */}
+      <AnimatePresence>
+        {isChallengeActive && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(9, 11, 15, 0.95)',
+              backdropFilter: 'blur(10px)',
+              zIndex: 20000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              style={{
+                background: 'var(--bg-surface)',
+                border: '2px solid var(--text-primary)',
+                padding: 32,
+                maxWidth: 400,
+                width: '100%',
+                boxShadow: '8px 8px 0px rgba(0,0,0,0.95)',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 16
+              }}
+            >
+              <div style={{
+                width: 60,
+                height: 60,
+                borderRadius: '50%',
+                background: 'rgba(245, 78, 0, 0.1)',
+                border: '2px solid var(--text-primary)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 8
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#F54E00';
-                e.currentTarget.style.color = 'white';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
-                e.currentTarget.style.color = 'var(--text-secondary)';
-              }}
-            >
-              Explore Platform (Guest Mode)
-            </button>
-
-            {/* Network Banner */}
-            <div style={{
-              marginTop: 20,
-              padding: 12,
-              background: '#0D0F14',
-              borderRadius: 10,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              fontSize: 11,
-              color: 'var(--text-secondary)',
-              border: '1px solid rgba(255,255,255,0.02)'
-            }}>
-              <Info size={14} color="#F54E00" />
-              <span>All smart account transactions are fully gas-sponsored on Arc Testnet.</span>
-            </div>
-          </div>
-        </div>
-      )}
+                animation: 'pulse 1.5s infinite ease-in-out'
+              }}>
+                <Shield size={28} color="#F54E00" className="spinning" style={{ animationDuration: '3s' }} />
+              </div>
+              <h3 style={{ fontSize: 18, fontWeight: 900, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-primary)' }}>
+                Verification Required
+              </h3>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                Please enter your PIN in the secure Circle verification window to authorize this transaction.
+              </p>
+              <div style={{
+                fontSize: 11,
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--text-tertiary)',
+                padding: '8px 12px',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-primary)',
+                width: '100%'
+              }}>
+                🔒 Protected by Circle Multi-Party Computation
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </CircleWalletContext.Provider>
   );
 }
